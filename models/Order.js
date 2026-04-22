@@ -12,26 +12,20 @@ const orderSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    address: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     items: [
       {
         foodId: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Food",
-          required: true,
         },
-        title: {
-          type: String,
-          required: true,
-        },
-        price: {
-          type: Number,
-          required: true,
-        },
-        quantity: {
-          type: Number,
-          required: true,
-          default: 1,
-        },
+        title: { type: String, required: true },
+        price: { type: Number, required: true },
+        quantity: { type: Number, required: true, default: 1 },
       },
     ],
     totalPrice: {
@@ -40,7 +34,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["new", "preparing", "delivered", "cancelled"], // 👈 qo‘shdik
+      enum: ["new", "preparing", "delivered", "cancelled"],
       default: "new",
     },
   },

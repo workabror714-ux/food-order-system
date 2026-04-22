@@ -1,387 +1,240 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const fetch = require("node-fetch");
-
 const connectDB = require("./db");
 const Food = require("./models/Food");
-const AdminUser = require("./models/AdminUser");
 const Order = require("./models/Order");
+const AdminUser = require("./models/AdminUser");
 
 const app = express();
-const JWT_SECRET = "super_secret_key_12345";
+const JWT_SECRET = process.env.JWT_SECRET || "restoran_secret_key_2024";
 
-const TELEGRAM_TOKEN = "8688570283:AAHbt4iK_OerNsjW7oXyvdjNHzLJPw_HESI";
-const CHAT_ID = "5954123597";
+// ─── TELEGRAM ────────────────────────────────────────────────────────────────
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TG_CHAT  = process.env.TELEGRAM_CHAT_ID;
 
-connectDB();
+const sendTelegram = async (text) => {
+  if (!TG_TOKEN || !TG_CHAT) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML" }),
+    });
+  } catch (e) {
+    console.error("Telegram xato:", e.message);
+  }
+};
 
+// ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
-app.use("/images", express.static(path.join(__dirname, "images")));
+app.use("/uploads", express.static("uploads"));
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "images"));
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
+if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
 
-const upload = multer({ storage });
+// ─── DATABASE ─────────────────────────────────────────────────────────────────
+connectDB();
 
-const sendTelegramMessage = async (text) => {
+// ─── AUTH MIDDLEWARE ──────────────────────────────────────────────────────────
+const authMiddleware = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Token yo'q!" });
   try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: CHAT_ID,
-        text,
-      }),
-    });
-  } catch (error) {
-    console.log("Telegram error:", error);
-  }
-};
-
-const createDefaultSuperadmin = async () => {
-  try {
-    const existing = await AdminUser.findOne({ username: "superadmin" });
-
-    if (!existing) {
-      const hashedPassword = await bcrypt.hash("12345678", 10);
-
-      await AdminUser.create({
-        username: "superadmin",
-        password: hashedPassword,
-        role: "superadmin",
-      });
-
-      console.log("Default superadmin yaratildi");
-      console.log("login: superadmin");
-      console.log("password: 12345678");
-    }
-  } catch (error) {
-    console.log("SUPERADMIN CREATE ERROR:", error);
-  }
-};
-
-const authMiddleware = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Token yo‘q" });
-    }
-
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-
-    const user = await AdminUser.findById(decoded.id).select("-password");
-
-    if (!user) {
-      return res.status(401).json({ message: "Foydalanuvchi topilmadi" });
-    }
-
-    req.user = user;
+    req.user = jwt.verify(token, JWT_SECRET);
     next();
-  } catch (error) {
-    res.status(401).json({ message: "Noto‘g‘ri token" });
+  } catch {
+    res.status(401).json({ message: "Token noto'g'ri yoki muddati o'tgan!" });
   }
 };
 
-const superadminMiddleware = (req, res, next) => {
-  if (req.user.role !== "superadmin") {
-    return res.status(403).json({ message: "Faqat superadmin mumkin" });
-  }
-
+const superAdminMiddleware = (req, res, next) => {
+  if (req.user.role !== "superadmin") return res.status(403).json({ message: "Ruxsat yo'q!" });
   next();
 };
 
-app.get("/", (req, res) => {
-  res.send("Food Order Server ishlayapti");
+// ─── FIRST ADMIN ─────────────────────────────────────────────────────────────
+const createFirstAdmin = async () => {
+  try {
+    const exists = await AdminUser.findOne({ username: "superadmin" });
+    if (!exists) {
+      const hashed = await bcrypt.hash("Admin123!", 10);
+      await new AdminUser({ username: "superadmin", password: hashed, role: "superadmin" }).save();
+      console.log("🚀 SuperAdmin yaratildi → username: superadmin | parol: Admin123!");
+    }
+  } catch (err) { console.error("Admin yaratishda xato:", err); }
+};
+
+// ─── MULTER ───────────────────────────────────────────────────────────────────
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    /jpeg|jpg|png|webp/.test(path.extname(file.originalname).toLowerCase())
+      ? cb(null, true) : cb(new Error("Faqat rasm!"));
+  },
 });
 
+// ════ AUTH ════════════════════════════════════════════════════════════════════
 app.post("/auth/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-
+    if (!username || !password) return res.status(400).json({ message: "Username va parol shart!" });
     const user = await AdminUser.findOne({ username });
-
-    if (!user) {
-      return res.status(400).json({ message: "Login yoki parol noto‘g‘ri" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: "Login yoki parol noto‘g‘ri" });
-    }
-
-    const token = jwt.sign(
-      {
-        id: user._id,
-        role: user.role,
-      },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    if (!user || !(await bcrypt.compare(password, user.password)))
+      return res.status(401).json({ message: "Username yoki parol xato!" });
+    const token = jwt.sign({ id: user._id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+    res.json({ token, user: { username: user.username, role: user.role } });
+  } catch { res.status(500).json({ message: "Server xatosi" }); }
 });
 
-app.get("/auth/me", authMiddleware, async (req, res) => {
-  res.json(req.user);
-});
-
-app.post("/auth/create-admin", authMiddleware, superadminMiddleware, async (req, res) => {
+app.post("/auth/create-admin", authMiddleware, superAdminMiddleware, async (req, res) => {
   try {
     const { username, password, role } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({ message: "Username va password kerak" });
-    }
-
-    const existing = await AdminUser.findOne({ username });
-
-    if (existing) {
-      return res.status(400).json({ message: "Bunday username bor" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newAdmin = await AdminUser.create({
-      username,
-      password: hashedPassword,
-      role: role === "superadmin" ? "superadmin" : "admin",
-    });
-
-    res.status(201).json({
-      id: newAdmin._id,
-      username: newAdmin.username,
-      role: newAdmin.role,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    if (await AdminUser.findOne({ username })) return res.status(400).json({ message: "Bu username band!" });
+    const hashed = await bcrypt.hash(password, 10);
+    const a = await new AdminUser({ username, password: hashed, role }).save();
+    res.status(201).json({ message: "Admin yaratildi", admin: { username: a.username, role: a.role } });
+  } catch { res.status(500).json({ message: "Xato" }); }
 });
 
-app.get("/auth/admins", authMiddleware, superadminMiddleware, async (req, res) => {
-  try {
-    const admins = await AdminUser.find()
-      .select("-password")
-      .sort({ createdAt: -1 });
-
-    res.json(admins);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+app.get("/auth/admins", authMiddleware, superAdminMiddleware, async (req, res) => {
+  try { res.json(await AdminUser.find().select("-password")); }
+  catch { res.status(500).json({ message: "Xato" }); }
 });
 
-app.delete("/auth/admins/:id", authMiddleware, superadminMiddleware, async (req, res) => {
+app.delete("/auth/admins/:id", authMiddleware, superAdminMiddleware, async (req, res) => {
   try {
-    const admin = await AdminUser.findById(req.params.id);
-
-    if (!admin) {
-      return res.status(404).json({ message: "Admin topilmadi" });
-    }
-
-    if (admin.username === "superadmin") {
-      return res.status(400).json({ message: "Default superadminni o‘chirib bo‘lmaydi" });
-    }
-
+    const a = await AdminUser.findById(req.params.id);
+    if (!a) return res.status(404).json({ message: "Topilmadi" });
+    if (a.role === "superadmin") return res.status(403).json({ message: "Superadminni o'chirib bo'lmaydi!" });
     await AdminUser.findByIdAndDelete(req.params.id);
-    res.json({ message: "Admin o‘chirildi" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    res.json({ message: "O'chirildi" });
+  } catch { res.status(500).json({ message: "Xato" }); }
 });
 
-app.get("/foods", async (req, res) => {
+// ════ FOODS ═══════════════════════════════════════════════════════════════════
+app.get("/api/foods", async (req, res) => {
   try {
-    const foods = await Food.find().sort({ createdAt: -1 });
-    res.json(foods);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const filter = req.query.category ? { category: req.query.category } : {};
+    res.json(await Food.find(filter).sort({ createdAt: -1 }));
+  } catch { res.status(500).json({ message: "Xato" }); }
 });
 
-app.post("/foods", authMiddleware, upload.single("image"), async (req, res) => {
+app.get("/api/foods/:id", async (req, res) => {
   try {
-    if (
-      !req.body.title ||
-      !req.body.price ||
-      !req.body.category ||
-      !req.body.description ||
-      !req.file
-    ) {
-      return res.status(400).json({ message: "Ma'lumot to‘liq emas" });
+    const food = await Food.findById(req.params.id);
+    if (!food) return res.status(404).json({ message: "Topilmadi" });
+    res.json(food);
+  } catch { res.status(500).json({ message: "Xato" }); }
+});
+
+app.post("/api/foods", authMiddleware, upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "Rasm shart!" });
+    const { title, price, category, description } = req.body;
+    const food = await new Food({ title, price: Number(price), category, description, image: `/uploads/${req.file.filename}` }).save();
+    res.status(201).json(food);
+  } catch (e) { res.status(500).json({ message: "Xato", error: e.message }); }
+});
+
+app.put("/api/foods/:id", authMiddleware, upload.single("image"), async (req, res) => {
+  try {
+    const { title, price, category, description } = req.body;
+    const update = { title, price: Number(price), category, description };
+    if (req.file) {
+      const old = await Food.findById(req.params.id);
+      if (old?.image) { const p = path.join(".", old.image); if (fs.existsSync(p)) fs.unlinkSync(p); }
+      update.image = `/uploads/${req.file.filename}`;
     }
-
-    const newFood = new Food({
-      title: req.body.title,
-      price: Number(req.body.price),
-      category: req.body.category,
-      description: req.body.description,
-      image: req.file.filename,
-    });
-
-    await newFood.save();
-    res.status(201).json(newFood);
-  } catch (error) {
-    console.log("POST ERROR:", error);
-    res.status(500).json({ message: error.message });
-  }
+    const updated = await Food.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!updated) return res.status(404).json({ message: "Topilmadi" });
+    res.json(updated);
+  } catch { res.status(500).json({ message: "Xato" }); }
 });
 
-app.put("/foods/:id", authMiddleware, async (req, res) => {
+app.delete("/api/foods/:id", authMiddleware, async (req, res) => {
   try {
-    const updatedFood = await Food.findByIdAndUpdate(
-      req.params.id,
-      {
-        title: req.body.title,
-        price: Number(req.body.price),
-        category: req.body.category,
-        description: req.body.description,
-      },
-      { new: true }
-    );
-
-    if (!updatedFood) {
-      return res.status(404).json({ message: "Taom topilmadi" });
-    }
-
-    res.json(updatedFood);
-  } catch (error) {
-    console.log("PUT ERROR:", error);
-    res.status(500).json({ message: error.message });
-  }
+    const food = await Food.findByIdAndDelete(req.params.id);
+    if (!food) return res.status(404).json({ message: "Topilmadi" });
+    if (food.image) { const p = path.join(".", food.image); if (fs.existsSync(p)) fs.unlinkSync(p); }
+    res.json({ message: "O'chirildi" });
+  } catch { res.status(500).json({ message: "Xato" }); }
 });
 
-app.delete("/foods/:id", authMiddleware, async (req, res) => {
+// ════ ORDERS ══════════════════════════════════════════════════════════════════
+app.post("/api/orders", async (req, res) => {
   try {
-    const deletedFood = await Food.findByIdAndDelete(req.params.id);
+    const { customerName, customerPhone, items, totalPrice, address } = req.body;
+    if (!customerName || !customerPhone || !items?.length)
+      return res.status(400).json({ message: "Ism, telefon va taomlar shart!" });
 
-    if (!deletedFood) {
-      return res.status(404).json({ message: "Taom topilmadi" });
-    }
+    const order = await new Order({ customerName, customerPhone, items, totalPrice, address, status: "new" }).save();
 
-    res.json({ message: "Taom o‘chirildi" });
-  } catch (error) {
-    console.log("DELETE ERROR:", error);
-    res.status(500).json({ message: error.message });
-  }
+    // ─── Telegram xabar ─────────────────────────────────────────────────────
+    const itemsList = items.map((i) => `  • ${i.title} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString()} so'm`).join("\n");
+    const msg =
+      `🛎 <b>YANGI BUYURTMA!</b>\n\n` +
+      `👤 <b>Mijoz:</b> ${customerName}\n` +
+      `📞 <b>Telefon:</b> ${customerPhone}\n` +
+      (address ? `📍 <b>Manzil:</b> ${address}\n` : "") +
+      `\n🍽 <b>Taomlar:</b>\n${itemsList}\n\n` +
+      `💰 <b>Jami: ${totalPrice?.toLocaleString()} so'm</b>`;
+    await sendTelegram(msg);
+
+    res.status(201).json({ message: "Buyurtma qabul qilindi! ✅", order });
+  } catch (e) { res.status(500).json({ message: "Xato", error: e.message }); }
 });
 
-app.post("/orders", async (req, res) => {
+app.get("/api/orders", authMiddleware, async (req, res) => {
   try {
-    const { customerName, customerPhone, tableNumber, paymentMethod, items } = req.body;
-
-    if (!customerName || !customerPhone || !tableNumber || !items || items.length === 0) {
-      return res.status(400).json({ message: "Ma'lumot to‘liq emas" });
-    }
-
-    const totalPrice = items.reduce((sum, item) => {
-      return sum + item.price * item.quantity;
-    }, 0);
-
-    const newOrder = new Order({
-      customerName,
-      customerPhone,
-      tableNumber,
-      paymentMethod,
-      items,
-      totalPrice,
-      status: "new",
-    });
-
-    await newOrder.save();
-
-    let message = `🆕 Yangi buyurtma\n\n`;
-    message += `👤 Ism: ${customerName}\n`;
-    message += `📞 Tel: ${customerPhone}\n`;
-    message += `🪑 Stol: ${tableNumber}\n`;
-    message += `💳 To‘lov: ${paymentMethod === "card" ? "Karta" : "Naqd"}\n\n`;
-
-    items.forEach((item) => {
-      message += `🍽 ${item.title} x ${item.quantity}\n`;
-    });
-
-    message += `\n💰 Jami: ${totalPrice} so‘m`;
-
-    await sendTelegramMessage(message);
-
-    res.status(201).json(newOrder);
-  } catch (error) {
-    console.log("ORDER CREATE ERROR:", error);
-    res.status(500).json({ message: error.message });
-  }
+    const filter = req.query.status ? { status: req.query.status } : {};
+    res.json(await Order.find(filter).sort({ createdAt: -1 }));
+  } catch { res.status(500).json({ message: "Xato" }); }
 });
 
-app.get("/orders", authMiddleware, async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.json(orders);
-  } catch (error) {
-    console.log("ORDER LIST ERROR:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-app.put("/orders/:id/status", authMiddleware, async (req, res) => {
+app.put("/api/orders/:id/status", authMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
+    if (!["new", "preparing", "delivered", "cancelled"].includes(status))
+      return res.status(400).json({ message: "Noto'g'ri status!" });
+    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    if (!order) return res.status(404).json({ message: "Topilmadi" });
 
-    const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
-
-    if (!updatedOrder) {
-      return res.status(404).json({ message: "Buyurtma topilmadi" });
+    // Telegram status xabari
+    const emoji = { preparing: "🍳", delivered: "✅", cancelled: "❌" };
+    const label = { preparing: "Tayyorlanmoqda", delivered: "Yetkazildi", cancelled: "Bekor qilindi" };
+    if (emoji[status]) {
+      await sendTelegram(
+        `${emoji[status]} <b>Buyurtma holati o'zgardi</b>\n\n` +
+        `👤 ${order.customerName} | 📞 ${order.customerPhone}\n` +
+        `📦 Holat: <b>${label[status]}</b>`
+      );
     }
-
-    res.json(updatedOrder);
-  } catch (error) {
-    console.log("ORDER STATUS ERROR:", error);
-    res.status(500).json({ message: error.message });
-  }
+    res.json(order);
+  } catch { res.status(500).json({ message: "Xato" }); }
 });
 
-app.delete("/orders/:id", authMiddleware, async (req, res) => {
+app.delete("/api/orders/:id", authMiddleware, async (req, res) => {
   try {
-    const deletedOrder = await Order.findByIdAndDelete(req.params.id);
-
-    if (!deletedOrder) {
-      return res.status(404).json({ message: "Buyurtma topilmadi" });
-    }
-
-    res.json({ message: "Buyurtma o‘chirildi" });
-  } catch (error) {
-    console.log("ORDER DELETE ERROR:", error);
-    res.status(500).json({ message: error.message });
-  }
+    await Order.findByIdAndDelete(req.params.id);
+    res.json({ message: "O'chirildi" });
+  } catch { res.status(500).json({ message: "Xato" }); }
 });
 
-app.listen(5000, async () => {
-  console.log("Server 5000 portda ishlayapti");
-  await createDefaultSuperadmin();
+// ─── SERVER ───────────────────────────────────────────────────────────────────
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, async () => {
+  console.log(`🚀 Server http://localhost:${PORT} da ishlayapti`);
+  await createFirstAdmin();
 });

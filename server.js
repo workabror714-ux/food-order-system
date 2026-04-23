@@ -20,18 +20,20 @@ const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TG_CHAT  = process.env.TELEGRAM_CHAT_ID;
 
 const sendTelegram = async (text) => {
-  if (!TG_TOKEN || !TG_CHAT) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML" }),
-    });
-  } catch (e) {
-    console.error("Telegram xato:", e.message);
+  if (!TG_TOKEN) return;
+  const targets = [TG_CHAT, process.env.TELEGRAM_CHANNEL_ID].filter(Boolean);
+  for (const chatId of targets) {
+    try {
+      await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+      });
+    } catch (e) {
+      console.error("Telegram xato:", e.message);
+    }
   }
 };
-
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());

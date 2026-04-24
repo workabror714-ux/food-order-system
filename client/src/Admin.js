@@ -10,7 +10,6 @@ export default function Admin() {
 
   const [tab, setTab] = useState("foods");
 
-  // Food states
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
@@ -20,25 +19,18 @@ export default function Admin() {
   const [editId, setEditId] = useState(null);
   const [foodLoading, setFoodLoading] = useState(false);
 
-  // Category states
   const [categories, setCategories] = useState([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [showCatInput, setShowCatInput] = useState(false);
-
-  // Category delete modal
-  const [deleteCatModal, setDeleteCatModal] = useState(null); // { name, foods[] }
-  const [deleteCatAction, setDeleteCatAction] = useState("delete"); // "delete" | "move"
+  const [deleteCatModal, setDeleteCatModal] = useState(null);
+  const [deleteCatAction, setDeleteCatAction] = useState("delete");
   const [moveToCat, setMoveToCat] = useState("");
-
-  // Food detail modal
   const [selectedFood, setSelectedFood] = useState(null);
 
-  // Order states
   const [orders, setOrders] = useState([]);
   const [orderFilter, setOrderFilter] = useState("all");
   const [ordersLoading, setOrdersLoading] = useState(false);
 
-  // Admin states
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("admin");
@@ -85,7 +77,7 @@ export default function Admin() {
     setTitle(""); setPrice(""); setCategory(""); setDescription(""); setImage(null); setEditId(null);
   };
 
-  // ─── CATEGORY ADD ─────────────────────────────────────────────────────────────
+  // ─── CATEGORY ────────────────────────────────────────────────────────────────
   const addCategory = () => {
     const trimmed = newCategoryName.trim();
     if (!trimmed) return;
@@ -95,7 +87,6 @@ export default function Admin() {
     setShowCatInput(false);
   };
 
-  // ─── CATEGORY DELETE ──────────────────────────────────────────────────────────
   const openDeleteCatModal = (catName) => {
     const catFoods = foods.filter((f) => f.category === catName);
     setDeleteCatModal({ name: catName, foods: catFoods });
@@ -105,39 +96,30 @@ export default function Admin() {
 
   const confirmDeleteCategory = async () => {
     const { name, foods: catFoods } = deleteCatModal;
-
     if (catFoods.length > 0) {
       if (deleteCatAction === "delete") {
-        // Delete all foods in this category
-        const confirmed = window.confirm(
-          `"${name}" kategoriyasidagi ${catFoods.length} ta taom ham o'chiriladi. Davom etasizmi?`
-        );
-        if (!confirmed) return;
+        if (!window.confirm(`"${name}" kategoriyasidagi ${catFoods.length} ta taom ham o'chiriladi. Davom etasizmi?`)) return;
         for (const food of catFoods) {
           await fetch(`${API}/api/foods/${food._id}`, { method: "DELETE", headers: authHeaders });
         }
       } else if (deleteCatAction === "move" && moveToCat) {
-        // Move all foods to another category
         for (const food of catFoods) {
           const formData = new FormData();
           formData.append("title", food.title);
           formData.append("price", food.price);
           formData.append("category", moveToCat);
           formData.append("description", food.description);
-          await fetch(`${API}/api/foods/${food._id}`, {
-            method: "PUT", headers: authHeaders, body: formData,
-          });
+          await fetch(`${API}/api/foods/${food._id}`, { method: "PUT", headers: authHeaders, body: formData });
         }
       }
     }
-
     setCategories((prev) => prev.filter((c) => c !== name));
     if (category === name) setCategory("");
     setDeleteCatModal(null);
     fetchFoods();
   };
 
-  // ─── FOOD SUBMIT ─────────────────────────────────────────────────────────────
+  // ─── FOOD CRUD ────────────────────────────────────────────────────────────────
   const handleFoodSubmit = async (e) => {
     e.preventDefault();
     if (!category) { alert("Kategoriya tanlang!"); return; }
@@ -184,6 +166,16 @@ export default function Admin() {
     if (res.ok) fetchOrders();
   };
 
+  // ─── ORDER DELETE ─────────────────────────────────────────────────────────────
+  const deleteOrder = async (id) => {
+    if (!window.confirm("Buyurtmani o'chirishni tasdiqlaysizmi?")) return;
+    const res = await fetch(`${API}/api/orders/${id}`, {
+      method: "DELETE",
+      headers: authHeaders,
+    });
+    if (res.ok) fetchOrders();
+  };
+
   // ─── ADMIN ───────────────────────────────────────────────────────────────────
   const handleCreateAdmin = async (e) => {
     e.preventDefault();
@@ -209,11 +201,14 @@ export default function Admin() {
   const statusLabel = { new: "Yangi", preparing: "Tayyorlanmoqda", delivered: "Yetkazildi", cancelled: "Bekor" };
   const statusColor = { new: "#3b82f6", preparing: "#f59e0b", delivered: "#10b981", cancelled: "#ef4444" };
 
+  // Food card image — direct URL (ImgBB) or via API
+  const foodImg = (food) => food.image?.startsWith("http") ? food.image : `${API}${food.image}`;
+
   return (
     <div className="admin-root">
       {/* TOP BAR */}
       <div className="admin-topbar">
-        <div className="admin-logo">🍽 Admin Panel</div>
+        <div className="admin-logo">🍃 Admin Panel</div>
         <div className="admin-user-info">
           <span className="admin-username">{savedUser.username}</span>
           <span className="admin-role-badge">{savedUser.role}</span>
@@ -251,7 +246,6 @@ export default function Admin() {
                     <input type="number" placeholder="35000" value={price} onChange={(e) => setPrice(e.target.value)} required />
                   </div>
 
-                  {/* ── CATEGORY SELECTOR WITH DELETE ── */}
                   <div className="input-group" style={{ gridColumn: "1 / -1" }}>
                     <label>Kategoriya *</label>
                     <div className="cat-select-wrap">
@@ -260,18 +254,14 @@ export default function Admin() {
                           <div key={cat} className="cat-chip-wrap">
                             <button type="button"
                               className={`cat-chip ${category === cat ? "selected" : ""}`}
-                              onClick={() => setCategory(cat)}
-                            >{cat}</button>
+                              onClick={() => setCategory(cat)}>{cat}</button>
                             <button type="button" className="cat-delete-btn"
                               onClick={(e) => { e.stopPropagation(); openDeleteCatModal(cat); }}
-                              title="Kategoriyani o'chirish"
-                            >✕</button>
+                              title="Kategoriyani o'chirish">✕</button>
                           </div>
                         ))}
                         <button type="button" className="cat-chip add-cat-btn"
-                          onClick={() => setShowCatInput(!showCatInput)}>
-                          + Yangi kategoriya
-                        </button>
+                          onClick={() => setShowCatInput(!showCatInput)}>+ Yangi kategoriya</button>
                       </div>
                       {showCatInput && (
                         <div className="cat-new-input">
@@ -282,9 +272,7 @@ export default function Admin() {
                           <button type="button" onClick={addCategory}>Qo'shish</button>
                         </div>
                       )}
-                      {category && (
-                        <p className="selected-cat-label">✅ Tanlandi: <strong>{category}</strong></p>
-                      )}
+                      {category && <p className="selected-cat-label">✅ Tanlandi: <strong>{category}</strong></p>}
                     </div>
                   </div>
 
@@ -317,7 +305,7 @@ export default function Admin() {
               <div className="food-admin-grid">
                 {foods.map((food) => (
                   <div key={food._id} className="food-admin-card" onClick={() => setSelectedFood(food)} style={{ cursor: "pointer" }}>
-                    <img src={`${API}${food.image}`} alt={food.title} className="food-admin-img"
+                    <img src={foodImg(food)} alt={food.title} className="food-admin-img"
                       onError={(e) => (e.target.src = "https://via.placeholder.com/200x120?text=Rasm")} />
                     <div className="food-admin-info">
                       <span className="food-admin-cat">{food.category}</span>
@@ -356,7 +344,7 @@ export default function Admin() {
             {ordersLoading ? (
               <div style={{ textAlign: "center", padding: 40 }}><div className="spinner" style={{ margin: "0 auto" }} /></div>
             ) : orders.length === 0 ? (
-              <div className="empty-state">Buyurtmalar yo'q</div>
+              <div style={{ textAlign: "center", padding: 60, color: "#888" }}>Buyurtmalar yo'q</div>
             ) : (
               <div className="orders-list">
                 {orders.map((order) => (
@@ -366,6 +354,13 @@ export default function Admin() {
                         <span className="order-name">{order.customerName}</span>
                         <span className="order-phone">📞 {order.customerPhone}</span>
                         {order.address && <span className="order-address">📍 {order.address}</span>}
+                        {order.location && (
+                          <a className="order-address"
+                            href={`https://yandex.com/maps/?pt=${order.location.lng},${order.location.lat}&z=16&l=map`}
+                            target="_blank" rel="noreferrer">
+                            🗺 Xaritada ko'rish
+                          </a>
+                        )}
                       </div>
                       <div className="order-right">
                         <span className="order-status-badge"
@@ -392,6 +387,8 @@ export default function Admin() {
                         {(order.status === "new" || order.status === "preparing") && (
                           <button className="status-btn cancelled" onClick={() => updateOrderStatus(order._id, "cancelled")}>✕ Bekor</button>
                         )}
+                        {/* ── DELETE BUTTON ── */}
+                        <button className="status-btn delete-order" onClick={() => deleteOrder(order._id)}>🗑 O'chirish</button>
                       </div>
                     </div>
                   </div>
@@ -449,8 +446,8 @@ export default function Admin() {
         <div className="modal-overlay" onClick={() => setSelectedFood(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setSelectedFood(null)}>✕</button>
-            <img src={`${API}${selectedFood.image}`} alt={selectedFood.title} className="modal-img"
-              onError={(e) => (e.target.src = "https://via.placeholder.com/400x250?text=Rasm+yo%27q")} />
+            <img src={foodImg(selectedFood)} alt={selectedFood.title} className="modal-img"
+              onError={(e) => (e.target.src = "https://via.placeholder.com/400x250?text=Rasm")} />
             <div className="modal-body">
               <span className="food-admin-cat">{selectedFood.category}</span>
               <h2 className="modal-title">{selectedFood.title}</h2>
@@ -474,9 +471,8 @@ export default function Admin() {
             <div className="modal-body">
               <div className="cat-del-icon">🗂</div>
               <h2 className="modal-title" style={{ fontSize: "1.2rem" }}>
-                "<span style={{ color: "#f97316" }}>{deleteCatModal.name}</span>" kategoriyasini o'chirish
+                "<span style={{ color: "var(--g)" }}>{deleteCatModal.name}</span>" kategoriyasini o'chirish
               </h2>
-
               {deleteCatModal.foods.length === 0 ? (
                 <p className="modal-desc">Bu kategoriyada taomlar yo'q. Xavfsiz o'chiriladi.</p>
               ) : (
@@ -490,29 +486,24 @@ export default function Admin() {
                     ))}
                   </div>
                   <p style={{ fontWeight: 700, marginBottom: 12, marginTop: 16 }}>Bu taomlar bilan nima qilish kerak?</p>
-
                   <div className="cat-del-options">
                     <label className={`cat-del-option ${deleteCatAction === "delete" ? "selected" : ""}`}>
                       <input type="radio" name="catAction" value="delete"
-                        checked={deleteCatAction === "delete"}
-                        onChange={() => setDeleteCatAction("delete")} />
+                        checked={deleteCatAction === "delete"} onChange={() => setDeleteCatAction("delete")} />
                       <div>
                         <strong>🗑 O'chirish</strong>
                         <p>Barcha {deleteCatModal.foods.length} ta taom o'chiriladi</p>
                       </div>
                     </label>
-
                     <label className={`cat-del-option ${deleteCatAction === "move" ? "selected" : ""}`}>
                       <input type="radio" name="catAction" value="move"
-                        checked={deleteCatAction === "move"}
-                        onChange={() => setDeleteCatAction("move")} />
+                        checked={deleteCatAction === "move"} onChange={() => setDeleteCatAction("move")} />
                       <div>
                         <strong>📦 Ko'chirish</strong>
                         <p>Boshqa kategoriyaga o'tkazish</p>
                       </div>
                     </label>
                   </div>
-
                   {deleteCatAction === "move" && (
                     <div className="input-group" style={{ marginTop: 12 }}>
                       <label>Qaysi kategoriyaga ko'chirish?</label>
@@ -525,14 +516,11 @@ export default function Admin() {
                   )}
                 </>
               )}
-
               <div className="modal-actions" style={{ marginTop: 20 }}>
                 <button className="btn-delete" onClick={confirmDeleteCategory}>
-                  {deleteCatModal.foods.length === 0
-                    ? "✕ O'chirish"
-                    : deleteCatAction === "delete"
-                    ? `🗑 ${deleteCatModal.foods.length} ta taom bilan o'chirish`
-                    : `📦 Ko'chirib o'chirish`}
+                  {deleteCatModal.foods.length === 0 ? "✕ O'chirish"
+                    : deleteCatAction === "delete" ? `🗑 ${deleteCatModal.foods.length} ta taom bilan o'chirish`
+                    : "📦 Ko'chirib o'chirish"}
                 </button>
                 <button className="btn-secondary" onClick={() => setDeleteCatModal(null)}>Bekor qilish</button>
               </div>

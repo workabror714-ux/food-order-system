@@ -111,15 +111,31 @@ export default function Menu() {
     );
   };
 
-  // Detail modal
-  const openDetail = food => {
-    setDetailFood(food);
-    setTimeout(() => setDetailVisible(true), 10);
+  // ── DETAIL MODAL — TO'G'RILANGAN ─────────────────────────────
+  // BUG: avval detailFood set bo'lib keyin visible=true bo'lardi,
+  // lekin React bir render ichida ikkalasini qilmasdi → chiziq ko'rinar edi
+  // FIX: avval food set qilamiz, keyin keyingi frame da visible=true
+  const openDetail = (food) => {
+    // 1) Avval body scroll o'chirish
     document.body.style.overflow = "hidden";
+    // 2) Food ni set qilamiz (modal DOM ga qo'shiladi, lekin hali visible=false → yashirin)
+    setDetailFood(food);
+    setDetailVisible(false);
+    // 3) Ikki frame kutib visible=true — animatsiya ishlaydi
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setDetailVisible(true);
+      });
+    });
   };
+
   const closeDetail = () => {
     setDetailVisible(false);
-    setTimeout(() => { setDetailFood(null); document.body.style.overflow = ""; }, 300);
+    // Animatsiya tugashini kutamiz (300ms), keyin unmount qilamiz
+    setTimeout(() => {
+      setDetailFood(null);
+      document.body.style.overflow = "";
+    }, 380);
   };
 
   // Order
@@ -284,20 +300,32 @@ export default function Menu() {
         </main>
       )}
 
-      {/* FOOD DETAIL MODAL */}
+      {/* ══ FOOD DETAIL MODAL — TO'G'RILANGAN ══ */}
       {detailFood && (
-        <div className={`g-overlay ${detailVisible ? "visible" : ""}`} onClick={closeDetail}>
-          <div className={`g-detail ${detailVisible ? "visible" : ""}`} onClick={e => e.stopPropagation()}>
-            {/* Drag handle */}
+        <div
+          className={`g-overlay ${detailVisible ? "visible" : ""}`}
+          onClick={closeDetail}
+        >
+          <div
+            className={`g-detail ${detailVisible ? "visible" : ""}`}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Drag handle — faqat mobilda */}
             <div className="g-detail-handle" />
             <button className="g-detail-close" onClick={closeDetail}>✕</button>
 
             <div className="g-detail-img-wrap">
-              <img src={detailFood.image} alt={detailFood.title} className="g-detail-img"
-                onError={e => e.target.src = "https://via.placeholder.com/500x300?text=Rasm"} />
+              <img
+                src={detailFood.image}
+                alt={detailFood.title}
+                className="g-detail-img"
+                onError={e => e.target.src = "https://via.placeholder.com/500x300?text=Rasm"}
+              />
               <div className="g-detail-img-overlay" />
               <div className="g-detail-img-bottom">
-                <span className="g-detail-cat-badge">{getEmoji(detailFood.category)} {detailFood.category}</span>
+                <span className="g-detail-cat-badge">
+                  {getEmoji(detailFood.category)} {detailFood.category}
+                </span>
               </div>
             </div>
 
@@ -325,11 +353,16 @@ export default function Menu() {
                     </div>
                     <div className="g-detail-subtotal">
                       <span className="g-subtotal-label">Jami</span>
-                      <span className="g-subtotal-price">{(detailFood.price * inCart.qty).toLocaleString()} so'm</span>
+                      <span className="g-subtotal-price">
+                        {(detailFood.price * inCart.qty).toLocaleString()} so'm
+                      </span>
                     </div>
                   </div>
                 ) : (
-                  <button className="g-detail-add-btn" onClick={() => { addToCart(detailFood); closeDetail(); }}>
+                  <button
+                    className="g-detail-add-btn"
+                    onClick={() => { addToCart(detailFood); closeDetail(); }}
+                  >
                     <span>🛒</span>
                     <span>Savatga qo'shish — {detailFood.price.toLocaleString()} so'm</span>
                   </button>
@@ -409,11 +442,15 @@ export default function Menu() {
 
                   {/* Address with autocomplete */}
                   <div className="g-form-field g-address-field">
-                    <label>Manzil (ixtiyoriy)</label>
+                    <label>Manzil *</label>
                     <div className="g-address-wrap">
-                      <input type="text" placeholder="Ko'cha, uy raqamini kiriting..."
+                      <input
+                        type="text"
+                        placeholder="Ko'cha, uy raqamini kiriting..."
                         value={addressQuery}
-                        onChange={e => setAddressQuery(e.target.value)} />
+                        onChange={e => setAddressQuery(e.target.value)}
+                        required
+                      />
                       {addressLoading && <span className="g-addr-loading">⏳</span>}
                     </div>
                     {addressSuggestions.length > 0 && (
@@ -429,8 +466,12 @@ export default function Menu() {
                   </div>
 
                   {/* Geo location */}
-                  <button type="button" className={`g-location-btn ${location ? "active" : ""}`}
-                    onClick={getLocation} disabled={locationLoading}>
+                  <button
+                    type="button"
+                    className={`g-location-btn ${location ? "active" : ""}`}
+                    onClick={getLocation}
+                    disabled={locationLoading}
+                  >
                     {locationLoading ? "📍 Aniqlanmoqda..." :
                      location ? `✅ GPS: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` :
                      "📍 GPS lokatsiyamni ulash"}

@@ -6,7 +6,7 @@ const path = require("path");
 const fs = require("fs");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const fetch = require(...args) = import('node-fetch').then(({default: f}) = f(...args));
+const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 const connectDB = require("./db");
 const Food = require("./models/Food");
 const Order = require("./models/Order");

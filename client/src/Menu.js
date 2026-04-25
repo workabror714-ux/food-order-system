@@ -3,7 +3,6 @@ import "./App.css";
 
 const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-// Category emoji map
 const CAT_EMOJI = {
   "fast food": "🍔", "burger": "🍔", "pizza": "🍕",
   "salat": "🥗", "salatlar": "🥗", "desert": "🍦", "desertlar": "🍦",
@@ -23,7 +22,6 @@ export default function Menu() {
   const [orderLoading, setOrderLoading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [detailFood, setDetailFood] = useState(null);
-  const [detailVisible, setDetailVisible] = useState(false);
   const [location, setLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [addressQuery, setAddressQuery] = useState("");
@@ -49,7 +47,6 @@ export default function Menu() {
       .catch(() => setLoading(false));
   }, []);
 
-  // Address suggestions via Nominatim (OpenStreetMap)
   useEffect(() => {
     if (!addressQuery || addressQuery.length < 3) { setAddressSuggestions([]); return; }
     const t = setTimeout(async () => {
@@ -67,19 +64,14 @@ export default function Menu() {
   }, [addressQuery]);
 
   const categories = [...new Set(foods.map(f => f.category))];
-
-  // Group foods by category
   const foodsByCategory = categories.reduce((acc, cat) => {
     acc[cat] = foods.filter(f => f.category === cat);
     return acc;
   }, {});
-
-  // Filtered by search
   const filteredFoods = search
     ? foods.filter(f => f.title.toLowerCase().includes(search.toLowerCase()))
     : null;
 
-  // Cart
   const addToCart = (food, e) => {
     e?.stopPropagation();
     setCart(prev => {
@@ -95,13 +87,11 @@ export default function Menu() {
   const totalPrice = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const totalItems = cart.reduce((s, i) => s + i.qty, 0);
 
-  // Scroll to category
   const scrollToCategory = (cat) => {
     setActiveCategory(cat);
     catRefs.current[cat]?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // Location
   const getLocation = () => {
     setLocationLoading(true);
     if (!navigator.geolocation) { setLocationLoading(false); return; }
@@ -111,34 +101,16 @@ export default function Menu() {
     );
   };
 
-  // ── DETAIL MODAL — TO'G'RILANGAN ─────────────────────────────
-  // BUG: avval detailFood set bo'lib keyin visible=true bo'lardi,
-  // lekin React bir render ichida ikkalasini qilmasdi → chiziq ko'rinar edi
-  // FIX: avval food set qilamiz, keyin keyingi frame da visible=true
+  // ODDIY: modal shunchaki set/unset — animatsiya yo'q, muammo yo'q
   const openDetail = (food) => {
-    // 1) Avval body scroll o'chirish
-    document.body.style.overflow = "hidden";
-    // 2) Food ni set qilamiz (modal DOM ga qo'shiladi, lekin hali visible=false → yashirin)
     setDetailFood(food);
-    setDetailVisible(false);
-    // 3) Ikki frame kutib visible=true — animatsiya ishlaydi
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setDetailVisible(true);
-      });
-    });
+    document.body.style.overflow = "hidden";
   };
-
   const closeDetail = () => {
-    setDetailVisible(false);
-    // Animatsiya tugashini kutamiz (300ms), keyin unmount qilamiz
-    setTimeout(() => {
-      setDetailFood(null);
-      document.body.style.overflow = "";
-    }, 380);
+    setDetailFood(null);
+    document.body.style.overflow = "";
   };
 
-  // Order
   const handleOrder = async e => {
     e.preventDefault();
     if (!cart.length) return;
@@ -203,27 +175,20 @@ export default function Menu() {
           </button>
         </div>
 
-        {/* Search */}
         <div className="g-search-bar">
           <span>🔍</span>
-          <input
-            className="g-search-input"
-            placeholder="Taom qidiring..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+          <input className="g-search-input" placeholder="Taom qidiring..."
+            value={search} onChange={e => setSearch(e.target.value)} />
           {search && <button className="g-search-clear" onClick={() => setSearch("")}>✕</button>}
         </div>
 
-        {/* Category tabs */}
         {!search && (
           <div className="g-cat-tabs-wrap">
             <div className="g-cat-tabs">
               {categories.map(cat => (
                 <button key={cat}
                   className={`g-cat-tab ${activeCategory === cat ? "active" : ""}`}
-                  onClick={() => scrollToCategory(cat)}
-                >
+                  onClick={() => scrollToCategory(cat)}>
                   <span className="g-cat-tab-emoji">{getEmoji(cat)}</span>
                   <span>{cat}</span>
                 </button>
@@ -233,7 +198,6 @@ export default function Menu() {
         )}
       </header>
 
-      {/* SUCCESS TOAST */}
       {orderSuccess && (
         <div className="g-toast">
           <span>🎉</span>
@@ -241,7 +205,6 @@ export default function Menu() {
         </div>
       )}
 
-      {/* SEARCH RESULTS */}
       {search ? (
         <main className="g-main">
           <div className="g-section-title">
@@ -253,14 +216,11 @@ export default function Menu() {
               : filteredFoods.map((food, i) => (
                   <FoodCard key={food._id} food={food} cart={cart} index={i}
                     onAdd={addToCart} onQty={changeQty} onOpen={openDetail} />
-                ))
-            }
+                ))}
           </div>
         </main>
       ) : (
-        /* CATEGORY SECTIONS */
         <main className="g-main">
-          {/* HERO */}
           <div className="g-hero">
             <div className="g-hero-text">
               <h1 className="g-hero-title">
@@ -300,62 +260,39 @@ export default function Menu() {
         </main>
       )}
 
-      {/* ══ FOOD DETAIL MODAL — TO'G'RILANGAN ══ */}
+      {/* ══ FOOD DETAIL MODAL — admin panel modal-overlay uslubida ══ */}
       {detailFood && (
-        <div
-          className={`g-overlay ${detailVisible ? "visible" : ""}`}
-          onClick={closeDetail}
-        >
-          <div
-            className={`g-detail ${detailVisible ? "visible" : ""}`}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Drag handle — faqat mobilda */}
-            <div className="g-detail-handle" />
-            <button className="g-detail-close" onClick={closeDetail}>✕</button>
-
-            <div className="g-detail-img-wrap">
-              <img
-                src={detailFood.image}
-                alt={detailFood.title}
-                className="g-detail-img"
-                onError={e => e.target.src = "https://via.placeholder.com/500x300?text=Rasm"}
-              />
-              <div className="g-detail-img-overlay" />
-              <div className="g-detail-img-bottom">
-                <span className="g-detail-cat-badge">
-                  {getEmoji(detailFood.category)} {detailFood.category}
-                </span>
-              </div>
-            </div>
-
-            <div className="g-detail-body">
-              <h2 className="g-detail-title">{detailFood.title}</h2>
-
-              <div className="g-detail-price-row">
-                <div className="g-detail-price">{detailFood.price.toLocaleString()} so'm</div>
-              </div>
-
-              <div className="g-detail-divider" />
-
-              <p className="g-detail-desc">{detailFood.description}</p>
-
-              <div className="g-detail-divider" />
-
+        <div className="modal-overlay" onClick={closeDetail}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" onClick={closeDetail}>✕</button>
+            <img
+              src={detailFood.image}
+              alt={detailFood.title}
+              className="modal-img"
+              onError={e => e.target.src = "https://via.placeholder.com/500x300?text=Rasm"}
+            />
+            <div className="modal-body">
+              <span className="food-admin-cat">
+                {getEmoji(detailFood.category)} {detailFood.category}
+              </span>
+              <h2 className="modal-title">{detailFood.title}</h2>
+              <p className="modal-price">{detailFood.price.toLocaleString()} so'm</p>
+              <p className="modal-desc">{detailFood.description}</p>
+              <div style={{ height: 1, background: "var(--g3)", margin: "12px 0" }} />
               {(() => {
                 const inCart = cart.find(i => i._id === detailFood._id);
                 return inCart ? (
-                  <div className="g-detail-controls">
-                    <div className="g-detail-qty">
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                       <button className="g-qty-btn-lg minus" onClick={() => changeQty(detailFood._id, -1)}>−</button>
                       <span className="g-qty-num-lg">{inCart.qty}</span>
                       <button className="g-qty-btn-lg plus" onClick={() => changeQty(detailFood._id, 1)}>+</button>
                     </div>
-                    <div className="g-detail-subtotal">
-                      <span className="g-subtotal-label">Jami</span>
-                      <span className="g-subtotal-price">
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "0.78rem", color: "var(--gray)" }}>Jami</div>
+                      <div style={{ fontSize: "1.2rem", fontWeight: 900, color: "var(--g4)" }}>
                         {(detailFood.price * inCart.qty).toLocaleString()} so'm
-                      </span>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -375,7 +312,7 @@ export default function Menu() {
 
       {/* CART DRAWER */}
       {cartOpen && (
-        <div className="g-overlay visible" onClick={() => setCartOpen(false)}>
+        <div className="modal-overlay" onClick={() => setCartOpen(false)}>
           <div className="g-drawer" onClick={e => e.stopPropagation()}>
             <div className="g-drawer-header">
               <div>
@@ -440,17 +377,12 @@ export default function Menu() {
                       onChange={e => setOrderForm({ ...orderForm, phone: e.target.value })} />
                   </div>
 
-                  {/* Address with autocomplete */}
                   <div className="g-form-field g-address-field">
                     <label>Manzil *</label>
                     <div className="g-address-wrap">
-                      <input
-                        type="text"
-                        placeholder="Ko'cha, uy raqamini kiriting..."
+                      <input type="text" placeholder="Ko'cha, uy raqamini kiriting..." required
                         value={addressQuery}
-                        onChange={e => setAddressQuery(e.target.value)}
-                        required
-                      />
+                        onChange={e => setAddressQuery(e.target.value)} />
                       {addressLoading && <span className="g-addr-loading">⏳</span>}
                     </div>
                     {addressSuggestions.length > 0 && (
@@ -465,22 +397,15 @@ export default function Menu() {
                     )}
                   </div>
 
-                  {/* Geo location */}
-                  <button
-                    type="button"
-                    className={`g-location-btn ${location ? "active" : ""}`}
-                    onClick={getLocation}
-                    disabled={locationLoading}
-                  >
+                  <button type="button" className={`g-location-btn ${location ? "active" : ""}`}
+                    onClick={getLocation} disabled={locationLoading}>
                     {locationLoading ? "📍 Aniqlanmoqda..." :
                      location ? `✅ GPS: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` :
                      "📍 GPS lokatsiyamni ulash"}
                   </button>
 
                   <button type="submit" className="g-order-btn" disabled={orderLoading}>
-                    {orderLoading ? (
-                      <span>Yuborilmoqda...</span>
-                    ) : (
+                    {orderLoading ? <span>Yuborilmoqda...</span> : (
                       <>
                         <span>✅ Buyurtma berish</span>
                         <span className="g-order-btn-price">{totalPrice.toLocaleString()} so'm</span>
@@ -497,7 +422,6 @@ export default function Menu() {
   );
 }
 
-// ─── FOOD CARD COMPONENT ──────────────────────────────────────────────────────
 function FoodCard({ food, cart, index, onAdd, onQty, onOpen }) {
   const inCart = cart.find(i => i._id === food._id);
   return (

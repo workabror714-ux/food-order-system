@@ -633,7 +633,7 @@ body { font-family: 'Outfit', sans-serif; background: #f2f7f2; color: #0f1f0f; -
 
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.modal-card { background: white; border-radius: 20px; width: 100%; max-width: 500px; overflow: hidden; position: relative; animation: modalIn 0.22s ease; max-height: 90vh; overflow-y: auto; }
+.modal-card { background: white; border-radius: 20px; width: 100%; max-width: 500px; overflow-y: auto; position: relative; animation: modalIn 0.22s ease; max-height: 90vh; }
 @keyframes modalIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .modal-close { position: absolute; top: 12px; right: 12px; z-index: 10; background: rgba(0,0,0,0.3); color: white; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .modal-img { width: 100%; height: 240px; object-fit: cover; display: block; }

@@ -260,16 +260,17 @@ export default function Menu() {
         </main>
       )}
 
-      {/* ══ FOOD DETAIL MODAL — admin panel modal-overlay uslubida ══ */}
+      {/* ══ FOOD DETAIL MODAL ══ */}
       {detailFood && (
         <div className="modal-overlay" onClick={closeDetail}>
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
+          <div className="modal-card" style={{ overflowY: "auto", maxHeight: "90vh" }} onClick={e => e.stopPropagation()}>
             <button className="modal-close" onClick={closeDetail}>✕</button>
             <img
-              src={detailFood.image}
+              src={detailFood.image?.startsWith("http") ? detailFood.image : `${API}${detailFood.image}`}
               alt={detailFood.title}
               className="modal-img"
-              onError={e => e.target.src = "https://via.placeholder.com/500x300?text=Rasm"}
+              style={{ width: "100%", height: 240, objectFit: "cover", display: "block", flexShrink: 0 }}
+              onError={e => { e.target.onerror = null; e.target.src = "https://placehold.co/500x240/e8f5ee/1d6b3e?text=Rasm+yo%27q"; }}
             />
             <div className="modal-body">
               <span className="food-admin-cat">

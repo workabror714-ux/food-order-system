@@ -361,18 +361,20 @@ export default function Menu() {
   );
 }
 
-// Modal YO'Q — faqat karta, + tugmasi savatga qo'shadi
+import { useNavigate } from "react-router-dom";
+
 function FoodCard({ food, cart, index, onAdd, onQty }) {
   const inCart = cart.find(i => i._id === food._id);
+  const navigate = useNavigate();
   return (
     <div className="g-card" style={{ animationDelay: `${index * 0.06}s` }}>
-      <div className="g-card-img-wrap">
+      <div className="g-card-img-wrap" onClick={() => navigate(`/food/${food._id}`)} style={{ cursor: "pointer" }}>
         <img src={food.image} alt={food.title} className="g-card-img"
           onError={e => e.target.src = "https://via.placeholder.com/300x200?text=Rasm"} />
         {inCart && <div className="g-card-in-cart">✓ Savatda</div>}
       </div>
       <div className="g-card-body">
-        <h3 className="g-card-title">{food.title}</h3>
+        <h3 className="g-card-title" onClick={() => navigate(`/food/${food._id}`)} style={{ cursor: "pointer" }}>{food.title}</h3>
         <p className="g-card-desc">{food.description}</p>
         <div className="g-card-footer">
           <span className="g-card-price">{food.price.toLocaleString()} so'm</span>

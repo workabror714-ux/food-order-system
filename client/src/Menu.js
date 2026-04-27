@@ -21,7 +21,6 @@ export default function Menu() {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [detailFood, setDetailFood] = useState(null);
   const [location, setLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [addressQuery, setAddressQuery] = useState("");
@@ -99,16 +98,6 @@ export default function Menu() {
       pos => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocationLoading(false); },
       () => setLocationLoading(false)
     );
-  };
-
-  // ODDIY: modal shunchaki set/unset — animatsiya yo'q, muammo yo'q
-  const openDetail = (food) => {
-    setDetailFood(food);
-    document.body.style.overflow = "hidden";
-  };
-  const closeDetail = () => {
-    setDetailFood(null);
-    document.body.style.overflow = "";
   };
 
   const handleOrder = async e => {
@@ -215,7 +204,7 @@ export default function Menu() {
               ? <div className="g-empty">Taom topilmadi</div>
               : filteredFoods.map((food, i) => (
                   <FoodCard key={food._id} food={food} cart={cart} index={i}
-                    onAdd={addToCart} onQty={changeQty} onOpen={openDetail} />
+                    onAdd={addToCart} onQty={changeQty} />
                 ))}
           </div>
         </main>
@@ -252,63 +241,12 @@ export default function Menu() {
               <div className="g-grid">
                 {foodsByCategory[cat].map((food, i) => (
                   <FoodCard key={food._id} food={food} cart={cart} index={i}
-                    onAdd={addToCart} onQty={changeQty} onOpen={openDetail} />
+                    onAdd={addToCart} onQty={changeQty} />
                 ))}
               </div>
             </div>
           ))}
         </main>
-      )}
-
-      {/* ══ FOOD DETAIL MODAL ══ */}
-      {detailFood && (
-        <div className="modal-overlay" onClick={closeDetail}>
-          <div className="modal-card" style={{ overflowY: "auto", maxHeight: "90vh" }} onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={closeDetail}>✕</button>
-            <img
-              src={detailFood.image?.startsWith("http") ? detailFood.image : `${API}${detailFood.image}`}
-              alt={detailFood.title}
-              className="modal-img"
-              style={{ width: "100%", height: 240, objectFit: "cover", display: "block", flexShrink: 0 }}
-              onError={e => { e.target.onerror = null; e.target.src = "https://placehold.co/500x240/e8f5ee/1d6b3e?text=Rasm+yo%27q"; }}
-            />
-            <div className="modal-body">
-              <span className="food-admin-cat">
-                {getEmoji(detailFood.category)} {detailFood.category}
-              </span>
-              <h2 className="modal-title">{detailFood.title}</h2>
-              <p className="modal-price">{detailFood.price.toLocaleString()} so'm</p>
-              <p className="modal-desc">{detailFood.description}</p>
-              <div style={{ height: 1, background: "var(--g3)", margin: "12px 0" }} />
-              {(() => {
-                const inCart = cart.find(i => i._id === detailFood._id);
-                return inCart ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <button className="g-qty-btn-lg minus" onClick={() => changeQty(detailFood._id, -1)}>−</button>
-                      <span className="g-qty-num-lg">{inCart.qty}</span>
-                      <button className="g-qty-btn-lg plus" onClick={() => changeQty(detailFood._id, 1)}>+</button>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: "0.78rem", color: "var(--gray)" }}>Jami</div>
-                      <div style={{ fontSize: "1.2rem", fontWeight: 900, color: "var(--g4)" }}>
-                        {(detailFood.price * inCart.qty).toLocaleString()} so'm
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    className="g-detail-add-btn"
-                    onClick={() => { addToCart(detailFood); closeDetail(); }}
-                  >
-                    <span>🛒</span>
-                    <span>Savatga qo'shish — {detailFood.price.toLocaleString()} so'm</span>
-                  </button>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
       )}
 
       {/* CART DRAWER */}
@@ -423,10 +361,11 @@ export default function Menu() {
   );
 }
 
-function FoodCard({ food, cart, index, onAdd, onQty, onOpen }) {
+// Modal YO'Q — faqat karta, + tugmasi savatga qo'shadi
+function FoodCard({ food, cart, index, onAdd, onQty }) {
   const inCart = cart.find(i => i._id === food._id);
   return (
-    <div className="g-card" style={{ animationDelay: `${index * 0.06}s` }} onClick={() => onOpen(food)}>
+    <div className="g-card" style={{ animationDelay: `${index * 0.06}s` }}>
       <div className="g-card-img-wrap">
         <img src={food.image} alt={food.title} className="g-card-img"
           onError={e => e.target.src = "https://via.placeholder.com/300x200?text=Rasm"} />
@@ -438,7 +377,7 @@ function FoodCard({ food, cart, index, onAdd, onQty, onOpen }) {
         <div className="g-card-footer">
           <span className="g-card-price">{food.price.toLocaleString()} so'm</span>
           {inCart ? (
-            <div className="g-qty" onClick={e => e.stopPropagation()}>
+            <div className="g-qty">
               <button className="g-qty-btn minus" onClick={() => onQty(food._id, -1)}>−</button>
               <span className="g-qty-num">{inCart.qty}</span>
               <button className="g-qty-btn plus" onClick={() => onQty(food._id, 1)}>+</button>

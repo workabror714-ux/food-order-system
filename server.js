@@ -15,20 +15,49 @@ const AdminUser = require("./models/AdminUser");
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "restoran_secret_key_2024";
 
-// ─── IMGBB UPLOAD ─────────────────────────────────────────────────────────────
-const uploadToImgBB = async (fileBuffer, fileName) => {
-  const base64 = fileBuffer.toString("base64");
-  const params = new URLSearchParams();
-  params.append("key", process.env.IMGBB_API_KEY);
-  params.append("image", base64);
-  params.append("name", fileName);
-  const res = await fetch("https://api.imgbb.com/1/upload", {
-    method: "POST",
-    body: params,
-  });
-  const data = await res.json();
-  if (data.success) return data.data.url;
-  throw new Error("ImgBB xato: " + JSON.stringify(data));
+// ─── RASM YUKLASH ─────────────────────────────────────────────────────────────
+// Ustuvorlik: 1) Cloudinary  2) ImgBB  3) Local
+const uploadImage = async (fileBuffer, fileName) => {
+  // 1. Cloudinary
+  if (process.env.CLOUDINARY_CLOUD_NAME) {
+    try {
+      const base64 = fileBuffer.toString("base64");
+      const ext = path.extname(fileName).replace(".", "") || "jpg";
+      const dataUri = `data:image/${ext};base64,${base64}`;
+      const formData = new URLSearchParams();
+      formData.append("file", dataUri);
+      formData.append("upload_preset", process.env.CLOUDINARY_UPLOAD_PRESET || "ml_default");
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: "POST", body: formData }
+      );
+      const data = await res.json();
+      if (data.secure_url) return data.secure_url;
+    } catch (e) { console.error("Cloudinary xato:", e.message); }
+  }
+
+  // 2. ImgBB
+  if (process.env.IMGBB_API_KEY) {
+    try {
+      const base64 = fileBuffer.toString("base64");
+      const params = new URLSearchParams();
+      params.append("key", process.env.IMGBB_API_KEY);
+      params.append("image", base64);
+      params.append("name", fileName);
+      const res = await fetch("https://api.imgbb.com/1/upload", {
+        method: "POST", body: params,
+      });
+      const data = await res.json();
+      if (data.success) return data.data.url;
+      console.error("ImgBB xato:", JSON.stringify(data));
+    } catch (e) { console.error("ImgBB xato:", e.message); }
+  }
+
+  // 3. Local fallback
+  if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
+  const filename = Date.now() + path.extname(fileName);
+  fs.writeFileSync(`./uploads/${filename}`, fileBuffer);
+  return `/uploads/${filename}`;
 };
 
 // ─── TELEGRAM ─────────────────────────────────────────────────────────────────
@@ -82,13 +111,13 @@ const createFirstAdmin = async () => {
   } catch (err) { console.error("Admin yaratishda xato:", err); }
 };
 
-// ─── MULTER (memory storage for ImgBB) ───────────────────────────────────────
+// ─── MULTER ───────────────────────────────────────────────────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
-    /jpeg|jpg|png|webp/.test(path.extname(file.originalname).toLowerCase())
-      ? cb(null, true) : cb(new Error("Faqat rasm!"));
+    /jpeg|jpg|png|webp|gif/.test(path.extname(file.originalname).toLowerCase())
+      ? cb(null, true) : cb(new Error("Faqat rasm fayllari!"));
   },
 });
 
@@ -150,18 +179,13 @@ app.post("/api/foods", authMiddleware, upload.single("image"), async (req, res) 
   try {
     if (!req.file) return res.status(400).json({ message: "Rasm shart!" });
     const { title, price, category, description } = req.body;
-    let imageUrl;
-    if (process.env.IMGBB_API_KEY) {
-      imageUrl = await uploadToImgBB(req.file.buffer, req.file.originalname);
-    } else {
-      // fallback to local
-      const filename = Date.now() + path.extname(req.file.originalname);
-      fs.writeFileSync(`./uploads/${filename}`, req.file.buffer);
-      imageUrl = `/uploads/${filename}`;
-    }
+    const imageUrl = await uploadImage(req.file.buffer, req.file.originalname);
     const food = await new Food({ title, price: Number(price), category, description, image: imageUrl }).save();
     res.status(201).json(food);
-  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+  } catch (e) {
+    console.error("Food POST xato:", e);
+    res.status(500).json({ message: "Xato: " + e.message });
+  }
 });
 
 app.put("/api/foods/:id", authMiddleware, upload.single("image"), async (req, res) => {
@@ -169,18 +193,15 @@ app.put("/api/foods/:id", authMiddleware, upload.single("image"), async (req, re
     const { title, price, category, description } = req.body;
     const update = { title, price: Number(price), category, description };
     if (req.file) {
-      if (process.env.IMGBB_API_KEY) {
-        update.image = await uploadToImgBB(req.file.buffer, req.file.originalname);
-      } else {
-        const filename = Date.now() + path.extname(req.file.originalname);
-        fs.writeFileSync(`./uploads/${filename}`, req.file.buffer);
-        update.image = `/uploads/${filename}`;
-      }
+      update.image = await uploadImage(req.file.buffer, req.file.originalname);
     }
     const updated = await Food.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!updated) return res.status(404).json({ message: "Topilmadi" });
     res.json(updated);
-  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+  } catch (e) {
+    console.error("Food PUT xato:", e);
+    res.status(500).json({ message: "Xato: " + e.message });
+  }
 });
 
 app.delete("/api/foods/:id", authMiddleware, async (req, res) => {
@@ -198,10 +219,16 @@ app.post("/api/orders", async (req, res) => {
     if (!customerName || !customerPhone || !items?.length)
       return res.status(400).json({ message: "Ism, telefon va taomlar shart!" });
 
-    const order = await new Order({ customerName, customerPhone, items, totalPrice, address, location, status: "new" }).save();
+    const order = await new Order({
+      customerName, customerPhone, items, totalPrice, address, location, status: "new"
+    }).save();
 
-    const itemsList = items.map((i) => `  • ${i.title} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString()} so'm`).join("\n");
-    const locationText = location ? `\n🗺 <b>Lokatsiya:</b> <a href="https://yandex.com/maps/?pt=${location.lng},${location.lat}&z=16&l=map">Xaritada ko'rish</a>` : "";
+    const itemsList = items.map(i =>
+      `  • ${i.title} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString()} so'm`
+    ).join("\n");
+    const locationText = location
+      ? `\n🗺 <b>Lokatsiya:</b> <a href="https://yandex.com/maps/?pt=${location.lng},${location.lat}&z=16&l=map">Xaritada ko'rish</a>`
+      : "";
     const msg =
       `🛎 <b>YANGI BUYURTMA!</b>\n\n` +
       `👤 <b>Mijoz:</b> ${customerName}\n` +
@@ -213,7 +240,10 @@ app.post("/api/orders", async (req, res) => {
     await sendTelegram(msg);
 
     res.status(201).json({ message: "Buyurtma qabul qilindi! ✅", order });
-  } catch (e) { res.status(500).json({ message: "Xato", error: e.message }); }
+  } catch (e) {
+    console.error("Order POST xato:", e);
+    res.status(500).json({ message: "Xato", error: e.message });
+  }
 });
 
 app.get("/api/orders", authMiddleware, async (req, res) => {

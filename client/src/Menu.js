@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import "./App.css";
 
 const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -15,20 +16,21 @@ const getEmoji = (cat) => CAT_EMOJI[cat?.toLowerCase()] || CAT_EMOJI.default;
 export default function Menu() {
   const [foods, setFoods] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("cart") || "[]"); } catch { return []; }
+  });
   const [activeCategory, setActiveCategory] = useState(null);
-  const [orderForm, setOrderForm] = useState({ name: "", phone: "" });
   const [orderSuccess, setOrderSuccess] = useState(false);
-  const [orderLoading, setOrderLoading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [location, setLocation] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [addressQuery, setAddressQuery] = useState("");
-  const [addressSuggestions, setAddressSuggestions] = useState([]);
-  const [addressLoading, setAddressLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [visible, setVisible] = useState(false);
   const catRefs = useRef({});
+  const navigate = useNavigate();
+
+  // Cart ni localStorage ga saqlab turish
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
 
   useEffect(() => {
     fetch(`${API}/api/foods`)
@@ -45,22 +47,6 @@ export default function Menu() {
       })
       .catch(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!addressQuery || addressQuery.length < 3) { setAddressSuggestions([]); return; }
-    const t = setTimeout(async () => {
-      setAddressLoading(true);
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addressQuery)}&format=json&limit=4&accept-language=uz,ru`
-        );
-        const data = await res.json();
-        setAddressSuggestions(data.map(d => d.display_name));
-      } catch {}
-      setAddressLoading(false);
-    }, 500);
-    return () => clearTimeout(t);
-  }, [addressQuery]);
 
   const categories = [...new Set(foods.map(f => f.category))];
   const foodsByCategory = categories.reduce((acc, cat) => {
@@ -89,45 +75,6 @@ export default function Menu() {
   const scrollToCategory = (cat) => {
     setActiveCategory(cat);
     catRefs.current[cat]?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const getLocation = () => {
-    setLocationLoading(true);
-    if (!navigator.geolocation) { setLocationLoading(false); return; }
-    navigator.geolocation.getCurrentPosition(
-      pos => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocationLoading(false); },
-      () => setLocationLoading(false)
-    );
-  };
-
-  const handleOrder = async e => {
-    e.preventDefault();
-    if (!cart.length) return;
-    setOrderLoading(true);
-    try {
-      const res = await fetch(`${API}/api/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerName: orderForm.name,
-          customerPhone: orderForm.phone,
-          address: addressQuery,
-          location,
-          items: cart.map(i => ({ foodId: i._id, title: i.title, price: i.price, quantity: i.qty })),
-          totalPrice,
-        }),
-      });
-      if (res.ok) {
-        setOrderSuccess(true);
-        setCart([]);
-        setCartOpen(false);
-        setOrderForm({ name: "", phone: "" });
-        setAddressQuery("");
-        setLocation(null);
-        setTimeout(() => setOrderSuccess(false), 5000);
-      }
-    } catch {}
-    finally { setOrderLoading(false); }
   };
 
   if (loading) return (
@@ -204,7 +151,7 @@ export default function Menu() {
               ? <div className="g-empty">Taom topilmadi</div>
               : filteredFoods.map((food, i) => (
                   <FoodCard key={food._id} food={food} cart={cart} index={i}
-                    onAdd={addToCart} onQty={changeQty} />
+                    onAdd={addToCart} onQty={changeQty} onOpen={() => navigate(`/food/${food._id}`)} />
                 ))}
           </div>
         </main>
@@ -241,7 +188,7 @@ export default function Menu() {
               <div className="g-grid">
                 {foodsByCategory[cat].map((food, i) => (
                   <FoodCard key={food._id} food={food} cart={cart} index={i}
-                    onAdd={addToCart} onQty={changeQty} />
+                    onAdd={addToCart} onQty={changeQty} onOpen={() => navigate(`/food/${food._id}`)} />
                 ))}
               </div>
             </div>
@@ -249,132 +196,37 @@ export default function Menu() {
         </main>
       )}
 
-      {/* CART DRAWER */}
-      {cartOpen && (
-        <div className="modal-overlay" onClick={() => setCartOpen(false)}>
-          <div className="cart-sheet" onClick={e => e.stopPropagation()}>
-            <div className="g-drawer-header">
-              <div>
-                <h2 className="g-drawer-title">Savat 🛒</h2>
-                {totalItems > 0 && <p className="g-drawer-sub">{totalItems} ta mahsulot</p>}
-              </div>
-              <button className="g-drawer-close" onClick={() => setCartOpen(false)}>✕</button>
-            </div>
-
-            {cart.length === 0 ? (
-              <div className="g-cart-empty">
-                <div className="g-cart-empty-icon">🛒</div>
-                <p className="g-cart-empty-title">Savat bo'sh</p>
-                <p className="g-cart-empty-sub">Taomlardan tanlang</p>
-                <button className="g-cart-empty-btn" onClick={() => setCartOpen(false)}>Menyuga qaytish</button>
-              </div>
-            ) : (
-              <>
-                <div className="g-cart-items">
-                  {cart.map(item => (
-                    <div key={item._id} className="g-cart-item">
-                      <img src={item.image} alt={item.title} className="g-cart-item-img"
-                        onError={e => e.target.src = "https://via.placeholder.com/60"} />
-                      <div className="g-cart-item-info">
-                        <p className="g-cart-item-title">{item.title}</p>
-                        <p className="g-cart-item-price">{item.price.toLocaleString()} so'm × {item.qty}</p>
-                        <p className="g-cart-item-total">{(item.price * item.qty).toLocaleString()} so'm</p>
-                      </div>
-                      <div className="g-cart-item-right">
-                        <div className="g-qty-mini">
-                          <button className="g-qty-mini-btn" onClick={() => changeQty(item._id, -1)}>−</button>
-                          <span>{item.qty}</span>
-                          <button className="g-qty-mini-btn" onClick={() => changeQty(item._id, 1)}>+</button>
-                        </div>
-                        <button className="g-remove-btn" onClick={() => removeFromCart(item._id)}>🗑</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="g-cart-total-block">
-                  <div className="g-cart-total-row">
-                    <span>Jami:</span>
-                    <span className="g-cart-total-sum">{totalPrice.toLocaleString()} so'm</span>
-                  </div>
-                </div>
-
-                <form className="g-order-form" onSubmit={handleOrder}>
-                  <div className="g-order-form-title">📝 Buyurtma ma'lumotlari</div>
-
-                  <div className="g-form-field">
-                    <label>Ismingiz *</label>
-                    <input type="text" placeholder="Isim Familiya" required
-                      value={orderForm.name}
-                      onChange={e => setOrderForm({ ...orderForm, name: e.target.value })} />
-                  </div>
-
-                  <div className="g-form-field">
-                    <label>Telefon *</label>
-                    <input type="tel" placeholder="+998 90 000 00 00" required
-                      value={orderForm.phone}
-                      onChange={e => setOrderForm({ ...orderForm, phone: e.target.value })} />
-                  </div>
-
-                  <div className="g-form-field g-address-field">
-                    <label>Manzil *</label>
-                    <div className="g-address-wrap">
-                      <input type="text" placeholder="Ko'cha, uy raqamini kiriting..." required
-                        value={addressQuery}
-                        onChange={e => setAddressQuery(e.target.value)} />
-                      {addressLoading && <span className="g-addr-loading">⏳</span>}
-                    </div>
-                    {addressSuggestions.length > 0 && (
-                      <div className="g-addr-suggestions">
-                        {addressSuggestions.map((s, i) => (
-                          <button key={i} type="button" className="g-addr-suggestion"
-                            onClick={() => { setAddressQuery(s); setAddressSuggestions([]); }}>
-                            📍 {s}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <button type="button" className={`g-location-btn ${location ? "active" : ""}`}
-                    onClick={getLocation} disabled={locationLoading}>
-                    {locationLoading ? "📍 Aniqlanmoqda..." :
-                     location ? `✅ GPS: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` :
-                     "📍 GPS lokatsiyamni ulash"}
-                  </button>
-
-                  <button type="submit" className="g-order-btn" disabled={orderLoading}>
-                    {orderLoading ? <span>Yuborilmoqda...</span> : (
-                      <>
-                        <span>✅ Buyurtma berish</span>
-                        <span className="g-order-btn-price">{totalPrice.toLocaleString()} so'm</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* ══ SAVAT ══ */}
+      <Cart
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        cart={cart}
+        totalPrice={totalPrice}
+        totalItems={totalItems}
+        onQty={changeQty}
+        onRemove={removeFromCart}
+        onClear={() => setCart([])}
+        onSuccess={() => {
+          setOrderSuccess(true);
+          setTimeout(() => setOrderSuccess(false), 5000);
+        }}
+      />
     </div>
   );
 }
 
-import { useNavigate } from "react-router-dom";
-
-function FoodCard({ food, cart, index, onAdd, onQty }) {
+// ─── FOOD CARD ────────────────────────────────────────────────────────────────
+function FoodCard({ food, cart, index, onAdd, onQty, onOpen }) {
   const inCart = cart.find(i => i._id === food._id);
-  const navigate = useNavigate();
   return (
     <div className="g-card" style={{ animationDelay: `${index * 0.06}s` }}>
-      <div className="g-card-img-wrap" onClick={() => navigate(`/food/${food._id}`)} style={{ cursor: "pointer" }}>
+      <div className="g-card-img-wrap" onClick={onOpen} style={{ cursor: "pointer" }}>
         <img src={food.image} alt={food.title} className="g-card-img"
-          onError={e => e.target.src = "https://via.placeholder.com/300x200?text=Rasm"} />
+          onError={e => e.target.src = "https://placehold.co/300x200/e8f5ee/1d6b3e?text=Rasm"} />
         {inCart && <div className="g-card-in-cart">✓ Savatda</div>}
       </div>
       <div className="g-card-body">
-        <h3 className="g-card-title" onClick={() => navigate(`/food/${food._id}`)} style={{ cursor: "pointer" }}>{food.title}</h3>
+        <h3 className="g-card-title" onClick={onOpen} style={{ cursor: "pointer" }}>{food.title}</h3>
         <p className="g-card-desc">{food.description}</p>
         <div className="g-card-footer">
           <span className="g-card-price">{food.price.toLocaleString()} so'm</span>
@@ -388,6 +240,162 @@ function FoodCard({ food, cart, index, onAdd, onQty }) {
             <button className="g-add-btn" onClick={e => onAdd(food, e)}>+</button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CART ─────────────────────────────────────────────────────────────────────
+function Cart({ open, onClose, cart, totalPrice, totalItems, onQty, onRemove, onClear, onSuccess }) {
+  const [step, setStep] = useState("items"); // "items" | "form"
+  const [form, setForm] = useState({ name: "", phone: "", address: "" });
+  const [loading, setLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [location, setLocation] = useState(null);
+
+  // Modal ochilganda body scroll o'chirish
+  useEffect(() => {
+    if (open) document.body.style.overflow = "hidden";
+    else { document.body.style.overflow = ""; setStep("items"); }
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  const getLocation = () => {
+    setLocationLoading(true);
+    navigator.geolocation?.getCurrentPosition(
+      pos => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocationLoading(false); },
+      () => setLocationLoading(false)
+    );
+  };
+
+  const handleOrder = async e => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: form.name,
+          customerPhone: form.phone,
+          address: form.address,
+          location,
+          items: cart.map(i => ({ foodId: i._id, title: i.title, price: i.price, quantity: i.qty })),
+          totalPrice,
+        }),
+      });
+      if (res.ok) {
+        onClear();
+        onClose();
+        onSuccess();
+        setForm({ name: "", phone: "", address: "" });
+        setLocation(null);
+      }
+    } catch {}
+    finally { setLoading(false); }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="cart-overlay" onClick={onClose}>
+      <div className="cart-modal" onClick={e => e.stopPropagation()}>
+
+        {/* HEADER */}
+        <div className="cart-header">
+          <div>
+            <h2 className="cart-title">
+              {step === "items" ? "🛒 Savat" : "📝 Buyurtma"}
+            </h2>
+            {totalItems > 0 && step === "items" && (
+              <p className="cart-subtitle">{totalItems} ta mahsulot</p>
+            )}
+          </div>
+          <button className="cart-close-btn" onClick={onClose}>✕</button>
+        </div>
+
+        {/* BO'SH SAVAT */}
+        {cart.length === 0 ? (
+          <div className="cart-empty">
+            <div className="cart-empty-icon">🛒</div>
+            <p className="cart-empty-title">Savat bo'sh</p>
+            <p className="cart-empty-sub">Taomlardan birini tanlang</p>
+            <button className="cart-empty-btn" onClick={onClose}>Menyuga qaytish</button>
+          </div>
+        ) : step === "items" ? (
+          /* ── ITEMS ── */
+          <div className="cart-body">
+            <div className="cart-items">
+              {cart.map(item => (
+                <div key={item._id} className="cart-item">
+                  <img src={item.image} alt={item.title} className="cart-item-img"
+                    onError={e => e.target.src = "https://placehold.co/60/e8f5ee/1d6b3e?text=+"} />
+                  <div className="cart-item-info">
+                    <p className="cart-item-title">{item.title}</p>
+                    <p className="cart-item-price">{item.price.toLocaleString()} so'm</p>
+                  </div>
+                  <div className="cart-item-right">
+                    <div className="cart-item-qty">
+                      <button onClick={() => onQty(item._id, -1)}>−</button>
+                      <span>{item.qty}</span>
+                      <button onClick={() => onQty(item._id, 1)}>+</button>
+                    </div>
+                    <p className="cart-item-total">{(item.price * item.qty).toLocaleString()} so'm</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="cart-footer">
+              <div className="cart-total-row">
+                <span>Jami:</span>
+                <span className="cart-total-sum">{totalPrice.toLocaleString()} so'm</span>
+              </div>
+              <button className="cart-next-btn" onClick={() => setStep("form")}>
+                Buyurtma berish →
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* ── FORM ── */
+          <div className="cart-body">
+            <form className="cart-form" onSubmit={handleOrder}>
+              <div className="cart-form-field">
+                <label>Ismingiz *</label>
+                <input type="text" placeholder="Isim Familiya" required
+                  value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div className="cart-form-field">
+                <label>Telefon *</label>
+                <input type="tel" placeholder="+998 90 000 00 00" required
+                  value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div className="cart-form-field">
+                <label>Manzil *</label>
+                <input type="text" placeholder="Ko'cha, uy raqami..." required
+                  value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
+              </div>
+
+              <button type="button" className={`cart-gps-btn ${location ? "active" : ""}`}
+                onClick={getLocation} disabled={locationLoading}>
+                {locationLoading ? "📍 Aniqlanmoqda..." :
+                 location ? `✅ GPS ulandi` : "📍 GPS lokatsiya ulash"}
+              </button>
+
+              <div className="cart-form-total">
+                <span>Jami to'lov:</span>
+                <strong>{totalPrice.toLocaleString()} so'm</strong>
+              </div>
+
+              <div className="cart-form-actions">
+                <button type="button" className="cart-back-btn" onClick={() => setStep("items")}>← Orqaga</button>
+                <button type="submit" className="cart-submit-btn" disabled={loading}>
+                  {loading ? "Yuborilmoqda..." : "✅ Tasdiqlash"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

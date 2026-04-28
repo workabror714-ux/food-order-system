@@ -4,27 +4,19 @@ import Menu from "./Menu";
 import Login from "./Login";
 import ProtectedRoute from "./ProtectedRoute";
 import FoodDetail from "./FoodDetail";
+import CartPage from "./CartPage";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* CUSTOMER UI */}
         <Route path="/" element={<Menu />} />
         <Route path="/menu" element={<Menu />} />
         <Route path="/table/:tableNumber" element={<Menu />} />
         <Route path="/food/:id" element={<FoodDetail />} />
-
-        {/* ADMIN */}
+        <Route path="/cart" element={<CartPage />} />
         <Route path="/login" element={<Login />} />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <Admin />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );

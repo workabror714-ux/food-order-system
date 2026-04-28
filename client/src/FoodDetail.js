@@ -13,13 +13,16 @@ const CAT_EMOJI = {
 };
 const getEmoji = (cat) => CAT_EMOJI[cat?.toLowerCase()] || CAT_EMOJI.default;
 
+const getCart = () => { try { return JSON.parse(localStorage.getItem("cart") || "[]"); } catch { return []; } };
+const saveCart = (cart) => localStorage.setItem("cart", JSON.stringify(cart));
+
 export default function FoodDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [food, setFood] = useState(null);
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
-  const [added, setAdded] = useState(false);
+  const [cartCount, setCartCount] = useState(() => getCart().reduce((s, i) => s + i.qty, 0));
 
   useEffect(() => {
     fetch(`${API}/api/foods/${id}`)
@@ -28,26 +31,31 @@ export default function FoodDetail() {
       .catch(() => setLoading(false));
   }, [id]);
 
+  // Savatdagi miqdorni o'rnatish
+  useEffect(() => {
+    if (!food) return;
+    const cart = getCart();
+    const inCart = cart.find(i => i._id === food._id);
+    if (inCart) setQty(inCart.qty);
+  }, [food]);
+
   const handleAdd = () => {
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const cart = getCart();
     const exists = cart.find(i => i._id === food._id);
     let newCart;
     if (exists) {
-      newCart = cart.map(i => i._id === food._id ? { ...i, qty: i.qty + qty } : i);
+      newCart = cart.map(i => i._id === food._id ? { ...i, qty } : i);
     } else {
       newCart = [...cart, { ...food, qty }];
     }
-    localStorage.setItem("cart", JSON.stringify(newCart));
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    saveCart(newCart);
+    setCartCount(newCart.reduce((s, i) => s + i.qty, 0));
+    navigate("/cart");
   };
 
   if (loading) return (
     <div className="g-loading">
-      <div className="g-spinner-wrap">
-        <div className="g-spinner-ring" />
-        <span className="g-spinner-emoji">🍃</span>
-      </div>
+      <div className="g-spinner-wrap"><div className="g-spinner-ring" /><span className="g-spinner-emoji">🍃</span></div>
       <p className="g-loading-text">Yuklanmoqda...</p>
     </div>
   );
@@ -66,40 +74,34 @@ export default function FoodDetail() {
     <div className="fd-root">
       {/* HEADER */}
       <div className="fd-header">
-        <button className="fd-back-btn-header" onClick={() => navigate(-1)}>
-          ← Orqaga
-        </button>
+        <button className="fd-back-btn-header" onClick={() => navigate(-1)}>← Orqaga</button>
         <span className="fd-header-title">Taom haqida</span>
-        <div style={{ width: 80 }} />
+        {cartCount > 0 ? (
+          <button className="fd-cart-btn" onClick={() => navigate("/cart")}>
+            🛒 <span className="fd-cart-btn-count">{cartCount}</span>
+          </button>
+        ) : <div style={{ width: 60 }} />}
       </div>
 
-      {/* IMAGE — TO'G'RILANGAN: aspect-ratio bilan */}
+      {/* IMAGE */}
       <div className="fd-img-wrap">
         <img
           src={food.image?.startsWith("http") ? food.image : `${API}${food.image}`}
-          alt={food.title}
-          className="fd-img"
+          alt={food.title} className="fd-img"
           onError={e => { e.target.onerror = null; e.target.src = "https://placehold.co/800x400/e8f5ee/1d6b3e?text=Rasm+yo%27q"; }}
         />
         <div className="fd-img-overlay" />
-        <div className="fd-cat-badge">
-          {getEmoji(food.category)} {food.category}
-        </div>
+        <div className="fd-cat-badge">{getEmoji(food.category)} {food.category}</div>
       </div>
 
       {/* CONTENT */}
       <div className="fd-content">
         <h1 className="fd-title">{food.title}</h1>
         <div className="fd-price">{food.price?.toLocaleString()} so'm</div>
-
         <div className="fd-divider" />
-
         <div className="fd-section-label">📝 Tavsif</div>
         <p className="fd-desc">{food.description || "Tavsif kiritilmagan"}</p>
-
         <div className="fd-divider" />
-
-        {/* QTY */}
         <div className="fd-section-label">🔢 Miqdor</div>
         <div className="fd-qty-row">
           <div className="fd-qty">
@@ -114,14 +116,12 @@ export default function FoodDetail() {
         </div>
       </div>
 
-      {/* BOTTOM BAR */}
+      {/* BOTTOM */}
       <div className="fd-bottom">
-        <button className={`fd-add-btn ${added ? "added" : ""}`} onClick={handleAdd}>
-          {added ? "✅ Savatga qo'shildi!" : `🛒 Savatga qo'shish — ${totalSum.toLocaleString()} so'm`}
+        <button className="fd-add-btn" onClick={handleAdd}>
+          🛒 Savatga qo'shish — {totalSum.toLocaleString()} so'm
         </button>
-        <button className="fd-menu-btn" onClick={() => navigate("/")}>
-          ← Menyuga qaytish
-        </button>
+        <button className="fd-menu-btn" onClick={() => navigate("/")}>← Menyuga qaytish</button>
       </div>
     </div>
   );

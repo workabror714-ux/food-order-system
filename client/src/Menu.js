@@ -18,6 +18,7 @@ const saveCart = (cart) => {
   localStorage.setItem("cart", JSON.stringify(cart));
   window.dispatchEvent(new Event("cartUpdated"));
 };
+const getProfile = () => { try { return JSON.parse(localStorage.getItem("profile") || "null"); } catch { return null; } };
 
 export default function Menu() {
   const [foods, setFoods] = useState([]);
@@ -27,6 +28,7 @@ export default function Menu() {
   const [visible, setVisible] = useState(false);
   const [cart, setCart] = useState(getCart);
   const [banner, setBanner] = useState(null);
+  const [profile, setProfile] = useState(getProfile);
   const catRefs = useRef({});
   const navigate = useNavigate();
 
@@ -50,11 +52,14 @@ export default function Menu() {
     }).catch(() => setLoading(false));
 
     const onCartUpdate = () => setCart(getCart());
+    const onProfileUpdate = () => setProfile(getProfile());
     window.addEventListener("cartUpdated", onCartUpdate);
     window.addEventListener("storage", onCartUpdate);
+    window.addEventListener("profileUpdated", onProfileUpdate);
     return () => {
       window.removeEventListener("cartUpdated", onCartUpdate);
       window.removeEventListener("storage", onCartUpdate);
+      window.removeEventListener("profileUpdated", onProfileUpdate);
     };
   }, []);
 
@@ -88,6 +93,11 @@ export default function Menu() {
     saveCart(newCart);
   };
 
+  // Profil initials
+  const initials = profile?.name
+    ? profile.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)
+    : null;
+
   if (loading) return (
     <div className="g-loading">
       <div className="g-spinner-wrap">
@@ -102,6 +112,7 @@ export default function Menu() {
     <div className={`g-root ${visible ? "visible" : ""}`}>
       <header className="g-header">
         <div className="g-header-inner">
+          {/* LOGO */}
           <div className="g-logo">
             <span className="g-logo-leaf">🍃</span>
             <div>
@@ -109,15 +120,34 @@ export default function Menu() {
               <div className="g-logo-sub">Tez yetkazib berish</div>
             </div>
           </div>
-          <button className="g-orders-btn" onClick={() => navigate("/orders")} aria-label="Buyurtmam">
-            <span>📦</span>
-          </button>
-          <button className="g-cart-nav" onClick={() => navigate("/cart")} aria-label="Savat">
-            <span className="g-cart-icon">🛒</span>
-            {cartCount > 0 && <span className="g-cart-badge">{cartCount}</span>}
-          </button>
+
+          {/* RIGHT ICONS */}
+          <div className="g-header-actions">
+            {/* Buyurtmam holati */}
+            <button className="g-orders-btn" onClick={() => navigate("/orders")} title="Buyurtmam holati">
+              📦
+            </button>
+
+            {/* Profil tugmasi */}
+            {initials ? (
+              <button className="g-profile-btn" onClick={() => navigate("/profile")} title="Profil">
+                {initials}
+              </button>
+            ) : (
+              <button className="g-login-btn" onClick={() => navigate("/login-user")} title="Kirish">
+                Kirish
+              </button>
+            )}
+
+            {/* Savat */}
+            <button className="g-cart-nav" onClick={() => navigate("/cart")} aria-label="Savat">
+              <span className="g-cart-icon">🛒</span>
+              {cartCount > 0 && <span className="g-cart-badge">{cartCount}</span>}
+            </button>
+          </div>
         </div>
 
+        {/* SEARCH */}
         <div className="g-search-bar">
           <span>🔍</span>
           <input className="g-search-input" placeholder="Taom qidiring..."
@@ -125,6 +155,7 @@ export default function Menu() {
           {search && <button className="g-search-clear" onClick={() => setSearch("")}>✕</button>}
         </div>
 
+        {/* CATEGORY TABS */}
         {!search && (
           <div className="g-cat-tabs-wrap">
             <div className="g-cat-tabs">
@@ -141,6 +172,7 @@ export default function Menu() {
         )}
       </header>
 
+      {/* FLOATING CART */}
       {cartCount > 0 && (
         <div className="g-float-cart" onClick={() => navigate("/cart")}>
           <span className="g-float-cart-text">🛒 {cartCount} ta mahsulot</span>
@@ -149,6 +181,7 @@ export default function Menu() {
         </div>
       )}
 
+      {/* SEARCH RESULTS */}
       {search ? (
         <main className="g-main">
           <div className="g-section-title">
@@ -166,7 +199,6 @@ export default function Menu() {
         </main>
       ) : (
         <main className="g-main">
-          {/* DYNAMIC HERO BANNER */}
           <HeroBanner banner={banner} />
 
           {categories.map(cat => (
@@ -191,22 +223,15 @@ export default function Menu() {
   );
 }
 
-// ── DYNAMIC HERO BANNER ─────────────────────────────────────────────────────
+// ── HERO BANNER ──────────────────────────────────────────────────────────────
 function HeroBanner({ banner }) {
-  const defaultBanner = {
-    title: "Mazali taomlar",
-    subtitle: "eshigingizgacha 🚀",
+  const b = banner || {
+    title: "Mazali taomlar", subtitle: "eshigingizgacha 🚀",
     description: "Yangi, tez va arzon yetkazib berish",
-    bgColor: "#0d4a28",
-    mediaType: "none",
-    mediaUrl: "",
-    events: []
+    bgColor: "#0d4a28", mediaType: "none", mediaUrl: "", events: []
   };
-  const b = banner || defaultBanner;
-
   return (
     <div className="g-hero" style={{ background: b.bgColor, position: "relative", overflow: "hidden" }}>
-      {/* Background media */}
       {b.mediaType === "image" && b.mediaUrl && (
         <img src={b.mediaUrl} alt="banner" style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
@@ -221,7 +246,6 @@ function HeroBanner({ banner }) {
           <source src={b.mediaUrl} />
         </video>
       )}
-
       <div style={{ position: "relative", zIndex: 1 }}>
         <h1 className="g-hero-title">
           {b.title}<br />
@@ -240,7 +264,6 @@ function HeroBanner({ banner }) {
           </div>
         )}
       </div>
-
       <div className="g-hero-stats" style={{ position: "relative", zIndex: 1 }}>
         <div className="g-stat">
           <span className="g-stat-num">30'</span>
@@ -255,7 +278,6 @@ function HeroBanner({ banner }) {
 function FoodCard({ food, index, cart, onOpen, onAdd, onChangeQty }) {
   const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
   const inCart = cart.find(i => i._id === food._id);
-
   return (
     <div className="g-card" style={{ animationDelay: `${index * 0.06}s` }} onClick={onOpen}>
       <div className="g-card-img-wrap">

@@ -1180,3 +1180,128 @@ body { font-family: 'Outfit', sans-serif; background: #f2f7f2; color: #0f1f0f; -
   background: #d0ecd8;
   transform: scale(1.06);
 }
+
+/* ════════════════════════════════════════════════════════════
+   HEADER ACTIONS — profile, orders, cart tugmalari
+════════════════════════════════════════════════════════════ */
+.g-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Profil initials tugmasi */
+.g-profile-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--g);
+  color: white;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+.g-profile-btn:hover { background: var(--g2); transform: scale(1.08); }
+
+/* "Kirish" tugmasi — loginlanmagan */
+.g-login-btn {
+  padding: 8px 14px;
+  background: var(--g3);
+  color: var(--g4);
+  border: none;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.g-login-btn:hover { background: #d0ecd8; transform: scale(1.03); }
+
+/* Orders tugmasi */
+.g-orders-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--g3);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1.15rem;
+  transition: background 0.2s, transform 0.18s;
+  flex-shrink: 0;
+}
+.g-orders-btn:hover { background: #d0ecd8; transform: scale(1.06); }
+
+/* Mobilda "Kirish" matnini yashir */
+@media (max-width: 380px) {
+  .g-login-btn { padding: 8px 10px; font-size: 0.78rem; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   USER AUTH PAGE — /login-user
+════════════════════════════════════════════════════════════ */
+.ua-root {
+  min-height: 100vh;
+  background: linear-gradient(160deg, #e8f5ee 0%, #f2f7f2 60%, #d1fae5 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.ua-card {
+  background: white;
+  border-radius: 28px;
+  padding: 36px 28px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(29,107,62,0.14);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.ua-logo {
+  font-size: 3.2rem;
+  margin-bottom: 4px;
+  filter: drop-shadow(0 4px 8px rgba(29,107,62,0.2));
+}
+.ua-title {
+  font-size: 1.7rem;
+  font-weight: 900;
+  color: var(--g4);
+  margin: 0;
+}
+.ua-desc {
+  font-size: 0.92rem;
+  color: var(--gray);
+  text-align: center;
+  margin-bottom: 4px;
+}
+.ua-phone-badge {
+  background: var(--g3);
+  color: var(--g4);
+  padding: 8px 20px;
+  border-radius: 30px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.ua-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}

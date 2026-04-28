@@ -196,6 +196,17 @@ export default function Menu() {
         </main>
       )}
 
+      {/* ══ FIXED BOTTOM CART BAR ══ */}
+      {totalItems > 0 && (
+        <div className="fixed-cart-bar" onClick={() => setCartOpen(true)}>
+          <div className="fixed-cart-left">
+            <span className="fixed-cart-count">{totalItems} ta</span>
+            <span className="fixed-cart-label">Savatni ko'rish</span>
+          </div>
+          <span className="fixed-cart-price">{totalPrice.toLocaleString()} so'm</span>
+        </div>
+      )}
+
       {/* ══ SAVAT ══ */}
       <Cart
         open={cartOpen}

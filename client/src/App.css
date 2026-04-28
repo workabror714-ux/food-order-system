@@ -1157,3 +1157,57 @@ body { font-family: 'Outfit', sans-serif; background: #f2f7f2; color: #0f1f0f; -
 }
 .cart-submit-btn:hover:not(:disabled) { background: var(--g2); }
 .cart-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ════════════════════════════════════════════════════════════
+   FIXED BOTTOM CART BAR — har doim pastda ko'rinib turadi
+════════════════════════════════════════════════════════════ */
+.fixed-cart-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 480px;
+  background: var(--g);
+  color: white;
+  border-radius: 18px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  z-index: 500;
+  box-shadow: 0 8px 32px rgba(29,107,62,0.35);
+  transition: all 0.2s;
+  animation: cartBarIn 0.3s cubic-bezier(0.34,1.2,0.64,1);
+}
+@keyframes cartBarIn {
+  from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+.fixed-cart-bar:hover { background: var(--g2); transform: translateX(-50%) scale(1.02); }
+.fixed-cart-bar:active { transform: translateX(-50%) scale(0.98); }
+
+.fixed-cart-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fixed-cart-count {
+  background: rgba(255,255,255,0.2);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+.fixed-cart-label {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.fixed-cart-price {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+/* Main content pastki bar balandligida padding olsin */
+.g-main { padding-bottom: 120px !important; }

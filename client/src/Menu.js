@@ -252,7 +252,7 @@ export default function Menu() {
       {/* CART DRAWER */}
       {cartOpen && (
         <div className="modal-overlay" onClick={() => setCartOpen(false)}>
-          <div className="g-drawer" onClick={e => e.stopPropagation()}>
+          <div className="cart-sheet" onClick={e => e.stopPropagation()}>
             <div className="g-drawer-header">
               <div>
                 <h2 className="g-drawer-title">Savat 🛒</h2>

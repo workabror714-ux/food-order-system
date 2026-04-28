@@ -29,7 +29,6 @@ export default function FoodDetail() {
   }, [id]);
 
   const handleAdd = () => {
-    // localStorage orqali savatga qo'shamiz
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
     const exists = cart.find(i => i._id === food._id);
     let newCart;
@@ -74,7 +73,7 @@ export default function FoodDetail() {
         <div style={{ width: 80 }} />
       </div>
 
-      {/* IMAGE */}
+      {/* IMAGE — TO'G'RILANGAN: aspect-ratio bilan */}
       <div className="fd-img-wrap">
         <img
           src={food.image?.startsWith("http") ? food.image : `${API}${food.image}`}

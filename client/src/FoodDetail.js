@@ -131,4 +131,4 @@ export default function FoodDetail() {
       </div>
     </div>
   );
-}
+} 

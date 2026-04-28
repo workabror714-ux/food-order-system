@@ -13,8 +13,10 @@ const CAT_EMOJI = {
 };
 const getEmoji = (cat) => CAT_EMOJI[cat?.toLowerCase()] || CAT_EMOJI.default;
 
-const getCart = () => {
-  try { return JSON.parse(localStorage.getItem("cart") || "[]"); } catch { return []; }
+const getCart = () => { try { return JSON.parse(localStorage.getItem("cart") || "[]"); } catch { return []; } };
+const saveCart = (cart) => {
+  localStorage.setItem("cart", JSON.stringify(cart));
+  window.dispatchEvent(new Event("cartUpdated"));
 };
 
 export default function Menu() {
@@ -23,18 +25,12 @@ export default function Menu() {
   const [activeCategory, setActiveCategory] = useState(null);
   const [search, setSearch] = useState("");
   const [visible, setVisible] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
-  const [cartTotal, setCartTotal] = useState(0);
+  const [cart, setCart] = useState(getCart);
   const catRefs = useRef({});
   const navigate = useNavigate();
 
-  const updateCartInfo = () => {
-    const cart = getCart();
-    const count = cart.reduce((t, i) => t + i.qty, 0);
-    const total = cart.reduce((t, i) => t + i.price * i.qty, 0);
-    setCartCount(count);
-    setCartTotal(total);
-  };
+  const cartCount = cart.reduce((t, i) => t + i.qty, 0);
+  const cartTotal = cart.reduce((t, i) => t + i.price * i.qty, 0);
 
   useEffect(() => {
     fetch(`${API}/api/foods`)
@@ -51,14 +47,12 @@ export default function Menu() {
       })
       .catch(() => setLoading(false));
 
-    updateCartInfo();
-
-    // Boshqa tabdan va same tabdan o'zgarishlarni tinglash
-    window.addEventListener("storage", updateCartInfo);
-    window.addEventListener("cartUpdated", updateCartInfo);
+    const onCartUpdate = () => setCart(getCart());
+    window.addEventListener("cartUpdated", onCartUpdate);
+    window.addEventListener("storage", onCartUpdate);
     return () => {
-      window.removeEventListener("storage", updateCartInfo);
-      window.removeEventListener("cartUpdated", updateCartInfo);
+      window.removeEventListener("cartUpdated", onCartUpdate);
+      window.removeEventListener("storage", onCartUpdate);
     };
   }, []);
 
@@ -67,7 +61,6 @@ export default function Menu() {
     acc[cat] = foods.filter(f => f.category === cat);
     return acc;
   }, {});
-
   const filteredFoods = search
     ? foods.filter(f => f.title.toLowerCase().includes(search.toLowerCase()))
     : null;
@@ -75,6 +68,22 @@ export default function Menu() {
   const scrollToCategory = (cat) => {
     setActiveCategory(cat);
     catRefs.current[cat]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const addToCart = (food, e) => {
+    e.stopPropagation();
+    const newCart = [...cart, { ...food, qty: 1 }];
+    setCart(newCart);
+    saveCart(newCart);
+  };
+
+  const changeQty = (foodId, delta, e) => {
+    e.stopPropagation();
+    const newCart = cart
+      .map(i => i._id === foodId ? { ...i, qty: i.qty + delta } : i)
+      .filter(i => i.qty > 0);
+    setCart(newCart);
+    saveCart(newCart);
   };
 
   if (loading) return (
@@ -89,7 +98,6 @@ export default function Menu() {
 
   return (
     <div className={`g-root ${visible ? "visible" : ""}`}>
-      {/* HEADER */}
       <header className="g-header">
         <div className="g-header-inner">
           <div className="g-logo">
@@ -99,9 +107,7 @@ export default function Menu() {
               <div className="g-logo-sub">Tez yetkazib berish</div>
             </div>
           </div>
-
-          {/* Savat tugmasi — header o'ng tomoni */}
-          <button className="g-cart-nav" onClick={() => navigate("/cart")} aria-label="Savatga o'tish">
+          <button className="g-cart-nav" onClick={() => navigate("/cart")} aria-label="Savat">
             <span className="g-cart-icon">🛒</span>
             {cartCount > 0 && <span className="g-cart-badge">{cartCount}</span>}
           </button>
@@ -109,26 +115,18 @@ export default function Menu() {
 
         <div className="g-search-bar">
           <span>🔍</span>
-          <input
-            className="g-search-input"
-            placeholder="Taom qidiring..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button className="g-search-clear" onClick={() => setSearch("")}>✕</button>
-          )}
+          <input className="g-search-input" placeholder="Taom qidiring..."
+            value={search} onChange={e => setSearch(e.target.value)} />
+          {search && <button className="g-search-clear" onClick={() => setSearch("")}>✕</button>}
         </div>
 
         {!search && (
           <div className="g-cat-tabs-wrap">
             <div className="g-cat-tabs">
               {categories.map(cat => (
-                <button
-                  key={cat}
+                <button key={cat}
                   className={`g-cat-tab ${activeCategory === cat ? "active" : ""}`}
-                  onClick={() => scrollToCategory(cat)}
-                >
+                  onClick={() => scrollToCategory(cat)}>
                   <span className="g-cat-tab-emoji">{getEmoji(cat)}</span>
                   <span>{cat}</span>
                 </button>
@@ -138,20 +136,14 @@ export default function Menu() {
         )}
       </header>
 
-      {/* FLOATING CART BAR — savat bo'sh bo'lmasa pastda chiqadi */}
       {cartCount > 0 && (
         <div className="g-float-cart" onClick={() => navigate("/cart")}>
-          <span className="g-float-cart-text">
-            🛒 {cartCount} ta mahsulot
-          </span>
-          <span className="g-float-cart-price">
-            {cartTotal.toLocaleString()} so'm
-          </span>
+          <span className="g-float-cart-text">🛒 {cartCount} ta mahsulot</span>
+          <span className="g-float-cart-price">{cartTotal.toLocaleString()} so'm</span>
           <span className="g-float-cart-btn">Savatga o'tish →</span>
         </div>
       )}
 
-      {/* SEARCH RESULTS */}
       {search ? (
         <main className="g-main">
           <div className="g-section-title">
@@ -161,18 +153,14 @@ export default function Menu() {
             {filteredFoods.length === 0
               ? <div className="g-empty">Taom topilmadi</div>
               : filteredFoods.map((food, i) => (
-                <FoodCard
-                  key={food._id}
-                  food={food}
-                  index={i}
+                <FoodCard key={food._id} food={food} index={i} cart={cart}
                   onOpen={() => navigate(`/food/${food._id}`)}
-                />
+                  onAdd={addToCart} onChangeQty={changeQty} />
               ))}
           </div>
         </main>
       ) : (
         <main className="g-main">
-          {/* Hero Section */}
           <div className="g-hero">
             <div className="g-hero-text">
               <h1 className="g-hero-title">
@@ -194,7 +182,6 @@ export default function Menu() {
             </div>
           </div>
 
-          {/* Category Sections */}
           {categories.map(cat => (
             <div key={cat} className="g-cat-section" ref={el => catRefs.current[cat] = el}>
               <div className="g-section-header">
@@ -204,12 +191,9 @@ export default function Menu() {
               </div>
               <div className="g-grid">
                 {foodsByCategory[cat].map((food, i) => (
-                  <FoodCard
-                    key={food._id}
-                    food={food}
-                    index={i}
+                  <FoodCard key={food._id} food={food} index={i} cart={cart}
                     onOpen={() => navigate(`/food/${food._id}`)}
-                  />
+                    onAdd={addToCart} onChangeQty={changeQty} />
                 ))}
               </div>
             </div>
@@ -220,37 +204,39 @@ export default function Menu() {
   );
 }
 
-function FoodCard({ food, index, onOpen }) {
-  const inCart = (() => {
-    try {
-      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-      return cart.find(i => i._id === food._id);
-    } catch { return null; }
-  })();
+function FoodCard({ food, index, cart, onOpen, onAdd, onChangeQty }) {
+  const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const inCart = cart.find(i => i._id === food._id);
 
   return (
-    <div
-      className="g-card"
-      style={{ animationDelay: `${index * 0.06}s` }}
-      onClick={onOpen}
-    >
+    <div className="g-card" style={{ animationDelay: `${index * 0.06}s` }} onClick={onOpen}>
       <div className="g-card-img-wrap">
         <img
           src={food.image?.startsWith("http") ? food.image : `${API}${food.image}`}
-          alt={food.title}
-          className="g-card-img"
+          alt={food.title} className="g-card-img"
           onError={e => e.target.src = "https://placehold.co/300x200/e8f5ee/1d6b3e?text=Rasm"}
         />
-        {inCart && (
-          <span className="g-card-in-cart">✓ {inCart.qty} ta</span>
-        )}
+        {inCart && <span className="g-card-in-cart">✓ {inCart.qty} ta</span>}
       </div>
       <div className="g-card-body">
         <h3 className="g-card-title">{food.title}</h3>
         <p className="g-card-desc">{food.description}</p>
         <div className="g-card-footer">
           <span className="g-card-price">{food.price.toLocaleString()} so'm</span>
-          <span className="g-card-arrow">→</span>
+
+          {inCart ? (
+            <div className="g-card-qty" onClick={e => e.stopPropagation()}>
+              <button className="g-card-qty-btn minus"
+                onClick={e => onChangeQty(food._id, -1, e)}>−</button>
+              <span className="g-card-qty-num">{inCart.qty}</span>
+              <button className="g-card-qty-btn plus"
+                onClick={e => onChangeQty(food._id, +1, e)}>+</button>
+            </div>
+          ) : (
+            <button className="g-card-add-btn"
+              onClick={e => onAdd(food, e)}
+              title="Savatga qo'shish">+</button>
+          )}
         </div>
       </div>
     </div>

@@ -25,6 +25,7 @@ export default function FoodDetail() {
   const [food, setFood] = useState(null);
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
   const [cartCount, setCartCount] = useState(() => getCart().reduce((s, i) => s + i.qty, 0));
 
   useEffect(() => {
@@ -42,9 +43,7 @@ export default function FoodDetail() {
   }, [food]);
 
   useEffect(() => {
-    const update = () => {
-      setCartCount(getCart().reduce((s, i) => s + i.qty, 0));
-    };
+    const update = () => setCartCount(getCart().reduce((s, i) => s + i.qty, 0));
     window.addEventListener("cartUpdated", update);
     return () => window.removeEventListener("cartUpdated", update);
   }, []);
@@ -60,7 +59,8 @@ export default function FoodDetail() {
     }
     saveCart(newCart);
     setCartCount(newCart.reduce((s, i) => s + i.qty, 0));
-    navigate("/cart");
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
   };
 
   if (loading) return (
@@ -82,9 +82,10 @@ export default function FoodDetail() {
 
   return (
     <div className="fd-root">
+      {/* HEADER */}
       <div className="fd-header">
         <button className="fd-back-btn-header" onClick={() => navigate(-1)}>← Orqaga</button>
-        <span className="fd-header-title">Taom haqida</span>
+        <span className="fd-header-title">{food.title}</span>
         {cartCount > 0 ? (
           <button className="fd-cart-btn" onClick={() => navigate("/cart")}>
             🛒 <span className="fd-cart-btn-count">{cartCount}</span>
@@ -92,6 +93,7 @@ export default function FoodDetail() {
         ) : <div style={{ width: 60 }} />}
       </div>
 
+      {/* IMAGE — kichikroq, chiroyli */}
       <div className="fd-img-wrap">
         <img
           src={food.image?.startsWith("http") ? food.image : `${API}${food.image}`}
@@ -102,33 +104,47 @@ export default function FoodDetail() {
         <div className="fd-cat-badge">{getEmoji(food.category)} {food.category}</div>
       </div>
 
+      {/* CONTENT CARD */}
       <div className="fd-content">
-        <h1 className="fd-title">{food.title}</h1>
-        <div className="fd-price">{food.price?.toLocaleString()} so'm</div>
-        <div className="fd-divider" />
-        <div className="fd-section-label">📝 Tavsif</div>
-        <p className="fd-desc">{food.description || "Tavsif kiritilmagan"}</p>
-        <div className="fd-divider" />
-        <div className="fd-section-label">🔢 Miqdor</div>
-        <div className="fd-qty-row">
-          <div className="fd-qty">
-            <button className="fd-qty-btn minus" onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
-            <span className="fd-qty-num">{qty}</span>
-            <button className="fd-qty-btn plus" onClick={() => setQty(q => q + 1)}>+</button>
+        <div className="fd-card">
+          <div className="fd-card-top">
+            <div>
+              <h1 className="fd-title">{food.title}</h1>
+              <div className="fd-price">{food.price?.toLocaleString()} so'm</div>
+            </div>
           </div>
-          <div className="fd-subtotal">
-            <span className="fd-subtotal-label">Jami</span>
-            <span className="fd-subtotal-price">{totalSum.toLocaleString()} so'm</span>
+
+          {food.description && (
+            <>
+              <div className="fd-divider" />
+              <div className="fd-section-label">📝 Tavsif</div>
+              <p className="fd-desc">{food.description}</p>
+            </>
+          )}
+
+          <div className="fd-divider" />
+          <div className="fd-section-label">🔢 Miqdor</div>
+          <div className="fd-qty-row">
+            <div className="fd-qty">
+              <button className="fd-qty-btn minus" onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
+              <span className="fd-qty-num">{qty}</span>
+              <button className="fd-qty-btn plus" onClick={() => setQty(q => q + 1)}>+</button>
+            </div>
+            <div className="fd-subtotal">
+              <span className="fd-subtotal-label">Jami</span>
+              <span className="fd-subtotal-price">{totalSum.toLocaleString()} so'm</span>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* BOTTOM */}
       <div className="fd-bottom">
-        <button className="fd-add-btn" onClick={handleAdd}>
-          🛒 Savatga qo'shish — {totalSum.toLocaleString()} so'm
+        <button className={`fd-add-btn ${added ? "added" : ""}`} onClick={handleAdd}>
+          {added ? "✅ Savatga qo'shildi!" : `🛒 Savatga qo'shish — ${totalSum.toLocaleString()} so'm`}
         </button>
         <button className="fd-menu-btn" onClick={() => navigate("/")}>← Menyuga qaytish</button>
       </div>
     </div>
   );
-} 
+}

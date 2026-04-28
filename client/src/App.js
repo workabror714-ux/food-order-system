@@ -5,6 +5,8 @@ import Login from "./Login";
 import ProtectedRoute from "./ProtectedRoute";
 import FoodDetail from "./FoodDetail";
 import CartPage from "./CartPage";
+import ProfilePage from "./ProfilePage";
+import OrderStatus from "./OrderStatus";
 
 function App() {
   return (
@@ -15,6 +17,8 @@ function App() {
         <Route path="/table/:tableNumber" element={<Menu />} />
         <Route path="/food/:id" element={<FoodDetail />} />
         <Route path="/cart" element={<CartPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/orders" element={<OrderStatus />} />
         <Route path="/login" element={<Login />} />
         <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
       </Routes>

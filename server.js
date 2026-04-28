@@ -16,9 +16,7 @@ const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "restoran_secret_key_2024";
 
 // ─── RASM YUKLASH ─────────────────────────────────────────────────────────────
-// Ustuvorlik: 1) Cloudinary  2) ImgBB  3) Local
 const uploadImage = async (fileBuffer, fileName) => {
-  // 1. Cloudinary
   if (process.env.CLOUDINARY_CLOUD_NAME) {
     try {
       const base64 = fileBuffer.toString("base64");
@@ -35,8 +33,6 @@ const uploadImage = async (fileBuffer, fileName) => {
       if (data.secure_url) return data.secure_url;
     } catch (e) { console.error("Cloudinary xato:", e.message); }
   }
-
-  // 2. ImgBB
   if (process.env.IMGBB_API_KEY) {
     try {
       const base64 = fileBuffer.toString("base64");
@@ -44,16 +40,11 @@ const uploadImage = async (fileBuffer, fileName) => {
       params.append("key", process.env.IMGBB_API_KEY);
       params.append("image", base64);
       params.append("name", fileName);
-      const res = await fetch("https://api.imgbb.com/1/upload", {
-        method: "POST", body: params,
-      });
+      const res = await fetch("https://api.imgbb.com/1/upload", { method: "POST", body: params });
       const data = await res.json();
       if (data.success) return data.data.url;
-      console.error("ImgBB xato:", JSON.stringify(data));
     } catch (e) { console.error("ImgBB xato:", e.message); }
   }
-
-  // 3. Local fallback
   if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
   const filename = Date.now() + path.extname(fileName);
   fs.writeFileSync(`./uploads/${filename}`, fileBuffer);
@@ -106,7 +97,7 @@ const createFirstAdmin = async () => {
     if (!exists) {
       const hashed = await bcrypt.hash("Admin123!", 10);
       await new AdminUser({ username: "superadmin", password: hashed, role: "superadmin" }).save();
-      console.log("🚀 SuperAdmin yaratildi → superadmin / Admin123!");
+      console.log("SuperAdmin yaratildi → superadmin / Admin123!");
     }
   } catch (err) { console.error("Admin yaratishda xato:", err); }
 };
@@ -114,12 +105,30 @@ const createFirstAdmin = async () => {
 // ─── MULTER ───────────────────────────────────────────────────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    /jpeg|jpg|png|webp|gif/.test(path.extname(file.originalname).toLowerCase())
-      ? cb(null, true) : cb(new Error("Faqat rasm fayllari!"));
+    /jpeg|jpg|png|webp|gif|mp4|webm/.test(path.extname(file.originalname).toLowerCase())
+      ? cb(null, true) : cb(new Error("Faqat rasm yoki video fayllari!"));
   },
 });
+
+// ─── IN-MEMORY BANNER STORE ───────────────────────────────────────────────────
+// MongoDB modeliga o'tkazishni xohlamasangiz, shunchaki fayliga yozamiz
+const BANNER_FILE = "./banner.json";
+const defaultBanner = {
+  title: "Mazali taomlar",
+  subtitle: "eshigingizgacha 🚀",
+  description: "Yangi, tez va arzon yetkazib berish",
+  mediaUrl: "",
+  mediaType: "none", // "none" | "image" | "video"
+  bgColor: "#0d4a28",
+  events: [] // [{id, label, emoji}]
+};
+const readBanner = () => {
+  try { return JSON.parse(fs.readFileSync(BANNER_FILE, "utf8")); }
+  catch { return defaultBanner; }
+};
+const writeBanner = (data) => fs.writeFileSync(BANNER_FILE, JSON.stringify(data, null, 2));
 
 // ════ AUTH ════════════════════════════════════════════════════════════════════
 app.post("/auth/login", async (req, res) => {
@@ -182,26 +191,18 @@ app.post("/api/foods", authMiddleware, upload.single("image"), async (req, res) 
     const imageUrl = await uploadImage(req.file.buffer, req.file.originalname);
     const food = await new Food({ title, price: Number(price), category, description, image: imageUrl }).save();
     res.status(201).json(food);
-  } catch (e) {
-    console.error("Food POST xato:", e);
-    res.status(500).json({ message: "Xato: " + e.message });
-  }
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
 });
 
 app.put("/api/foods/:id", authMiddleware, upload.single("image"), async (req, res) => {
   try {
     const { title, price, category, description } = req.body;
     const update = { title, price: Number(price), category, description };
-    if (req.file) {
-      update.image = await uploadImage(req.file.buffer, req.file.originalname);
-    }
+    if (req.file) update.image = await uploadImage(req.file.buffer, req.file.originalname);
     const updated = await Food.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!updated) return res.status(404).json({ message: "Topilmadi" });
     res.json(updated);
-  } catch (e) {
-    console.error("Food PUT xato:", e);
-    res.status(500).json({ message: "Xato: " + e.message });
-  }
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
 });
 
 app.delete("/api/foods/:id", authMiddleware, async (req, res) => {
@@ -240,16 +241,21 @@ app.post("/api/orders", async (req, res) => {
     await sendTelegram(msg);
 
     res.status(201).json({ message: "Buyurtma qabul qilindi! ✅", order });
-  } catch (e) {
-    console.error("Order POST xato:", e);
-    res.status(500).json({ message: "Xato", error: e.message });
-  }
+  } catch (e) { res.status(500).json({ message: "Xato", error: e.message }); }
 });
 
 app.get("/api/orders", authMiddleware, async (req, res) => {
   try {
     const filter = req.query.status ? { status: req.query.status } : {};
     res.json(await Order.find(filter).sort({ createdAt: -1 }));
+  } catch { res.status(500).json({ message: "Xato" }); }
+});
+
+// Mijoz o'z buyurtmalarini telefon raqami bilan oladi
+app.get("/api/orders/my/:phone", async (req, res) => {
+  try {
+    const orders = await Order.find({ customerPhone: req.params.phone }).sort({ createdAt: -1 }).limit(20);
+    res.json(orders);
   } catch { res.status(500).json({ message: "Xato" }); }
 });
 
@@ -280,9 +286,39 @@ app.delete("/api/orders/:id", authMiddleware, async (req, res) => {
   } catch { res.status(500).json({ message: "Xato" }); }
 });
 
+// ════ BANNER ══════════════════════════════════════════════════════════════════
+app.get("/api/banner", (req, res) => {
+  res.json(readBanner());
+});
+
+app.put("/api/banner", authMiddleware, upload.single("media"), async (req, res) => {
+  try {
+    const current = readBanner();
+    const { title, subtitle, description, bgColor, events, mediaType } = req.body;
+    let mediaUrl = current.mediaUrl;
+
+    if (req.file) {
+      mediaUrl = await uploadImage(req.file.buffer, req.file.originalname);
+    }
+
+    const updated = {
+      ...current,
+      title: title ?? current.title,
+      subtitle: subtitle ?? current.subtitle,
+      description: description ?? current.description,
+      bgColor: bgColor ?? current.bgColor,
+      mediaUrl: mediaType === "none" ? "" : mediaUrl,
+      mediaType: mediaType ?? current.mediaType,
+      events: events ? JSON.parse(events) : current.events,
+    };
+    writeBanner(updated);
+    res.json(updated);
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+});
+
 // ─── SERVER ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
-  console.log(`🚀 Server http://localhost:${PORT} da ishlayapti`);
+  console.log(`Server http://localhost:${PORT} da ishlayapti`);
   await createFirstAdmin();
 });

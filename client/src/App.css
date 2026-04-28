@@ -941,3 +941,242 @@ body { font-family: 'Outfit', sans-serif; background: #f2f7f2; color: #0f1f0f; -
   font-family: 'Outfit', sans-serif; margin-top: 12px; transition: background 0.2s;
 }
 .cp-success-btn:hover { background: var(--g2); }
+
+/* ════════════════════════════════════════════════════════════
+   FoodDetail — rasm kichikroq qilish
+════════════════════════════════════════════════════════════ */
+.fd-img-wrap {
+  max-height: 260px !important;
+  height: 30vw !important;
+  min-height: 180px !important;
+}
+.fd-card {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-top: 16px;
+}
+.fd-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   BANNER PREVIEW (Admin panel)
+════════════════════════════════════════════════════════════ */
+.banner-preview {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  min-height: 140px;
+  display: flex;
+  align-items: flex-end;
+  padding: 24px;
+}
+.banner-preview-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.35;
+  z-index: 0;
+}
+.banner-preview-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.1) 100%);
+  z-index: 0;
+}
+.banner-preview-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+}
+.banner-preview-title {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: white;
+  line-height: 1.2;
+}
+.banner-preview-subtitle {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #a8e6c1;
+  margin-top: 2px;
+}
+.banner-preview-desc {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.7);
+  margin-top: 6px;
+}
+.banner-preview-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.banner-preview-event {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+}
+
+/* ════════════════════════════════════════════════════════════
+   PROFILE PAGE
+════════════════════════════════════════════════════════════ */
+.pf-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, var(--g4), var(--g));
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 4px;
+}
+.pf-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 3px solid rgba(255,255,255,0.3);
+}
+.pf-hero-info { flex: 1; }
+.pf-hero-name { font-size: 1.1rem; font-weight: 900; color: white; }
+.pf-hero-phone { font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-top: 3px; }
+
+.pf-tabs {
+  display: flex;
+  gap: 6px;
+  background: white;
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: var(--shadow);
+}
+.pf-tab {
+  flex: 1;
+  padding: 10px 6px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--gray);
+  font-family: 'Outfit', sans-serif;
+  white-space: nowrap;
+  text-align: center;
+}
+.pf-tab.active { background: var(--g); color: white; }
+.pf-tab:hover:not(.active) { background: var(--g3); color: var(--g4); }
+
+.pf-card {
+  background: white;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.pf-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--g3);
+}
+.pf-info-row:last-of-type { border-bottom: none; }
+.pf-info-label { font-size: 0.85rem; color: var(--gray); font-weight: 600; }
+.pf-info-val { font-size: 0.9rem; font-weight: 700; color: var(--g4); text-align: right; }
+
+.pf-order-card {
+  background: white;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.pf-order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.pf-order-date { font-size: 0.8rem; color: var(--gray); }
+.pf-order-items { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.pf-order-total {
+  font-size: 0.9rem;
+  color: var(--gray);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--g3);
+}
+.pf-order-total strong { color: var(--g); font-weight: 800; }
+
+.pf-addr-card {
+  background: white;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.pf-addr-label {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--g4);
+  margin-bottom: 4px;
+}
+.pf-addr-text { font-size: 0.82rem; color: var(--gray); line-height: 1.4; }
+
+/* ════════════════════════════════════════════════════════════
+   ORDER STATUS PAGE
+════════════════════════════════════════════════════════════ */
+.os-search-card {
+  background: white;
+  border-radius: 20px;
+  padding: 32px 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.os-search-icon { font-size: 3.5rem; }
+.os-search-title { font-size: 1.3rem; font-weight: 900; color: var(--g4); }
+.os-search-desc { font-size: 0.9rem; color: var(--gray); line-height: 1.5; }
+
+/* Header dagi orders tugmasi */
+.g-orders-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--g3);
+  border: none;
+  border-radius: 13px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  transition: background 0.2s, transform 0.18s;
+  flex-shrink: 0;
+}
+.g-orders-btn:hover {
+  background: #d0ecd8;
+  transform: scale(1.06);
+}

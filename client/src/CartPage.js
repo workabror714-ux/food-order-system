@@ -6,34 +6,37 @@ const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
 const getCart = () => { try { return JSON.parse(localStorage.getItem("cart") || "[]"); } catch { return []; } };
 const saveCart = (cart) => {
   localStorage.setItem("cart", JSON.stringify(cart));
-  // Same tab da Menu.js ga xabar berish
   window.dispatchEvent(new Event("cartUpdated"));
 };
+const getProfile = () => { try { return JSON.parse(localStorage.getItem("profile") || "{}"); } catch { return {}; } };
+const getSavedAddresses = () => { try { return JSON.parse(localStorage.getItem("savedAddresses") || "[]"); } catch { return []; } };
 
 export default function CartPage() {
   const navigate = useNavigate();
   const [cart, setCart] = useState(getCart);
-  const [step, setStep] = useState("cart"); // "cart" | "form" | "success"
-  const [form, setForm] = useState({ name: "", phone: "", address: "" });
+  const [step, setStep] = useState("cart");
+  const [form, setForm] = useState(() => {
+    const p = getProfile();
+    return { name: p.name || "", phone: p.phone || "", address: "" };
+  });
   const [location, setLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [orderLoading, setOrderLoading] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState(getSavedAddresses);
+  const [showAddrPicker, setShowAddrPicker] = useState(false);
 
   const totalPrice = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const totalItems = cart.reduce((s, i) => s + i.qty, 0);
 
   useEffect(() => { saveCart(cart); }, [cart]);
+  useEffect(() => { setSavedAddresses(getSavedAddresses()); }, [step]);
 
   const changeQty = (id, delta) => {
-    setCart(prev =>
-      prev.map(i => i._id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i)
-    );
+    setCart(prev => prev.map(i => i._id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i));
   };
-
   const removeItem = (id) => setCart(prev => prev.filter(i => i._id !== id));
 
-  // GPS lokatsiya olish
   const getLocation = () => {
     setLocationError("");
     setLocationLoading(true);
@@ -47,15 +50,12 @@ export default function CartPage() {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setLocation({ lat, lng });
-        // Reverse geocoding — manzilni avtomatik to'ldirish
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=uz,ru`
           );
           const data = await res.json();
-          if (data.display_name) {
-            setForm(f => ({ ...f, address: data.display_name }));
-          }
+          if (data.display_name) setForm(f => ({ ...f, address: data.display_name }));
         } catch {}
         setLocationLoading(false);
       },
@@ -79,16 +79,16 @@ export default function CartPage() {
           customerPhone: form.phone,
           address: form.address,
           location,
-          items: cart.map(i => ({
-            foodId: i._id,
-            title: i.title,
-            price: i.price,
-            quantity: i.qty,
-          })),
+          items: cart.map(i => ({ foodId: i._id, title: i.title, price: i.price, quantity: i.qty })),
           totalPrice,
         }),
       });
       if (res.ok) {
+        // Profilga ham saqla
+        const profile = getProfile();
+        if (!profile.name) {
+          localStorage.setItem("profile", JSON.stringify({ ...profile, name: form.name, phone: form.phone }));
+        }
         localStorage.removeItem("cart");
         window.dispatchEvent(new Event("cartUpdated"));
         setCart([]);
@@ -103,36 +103,35 @@ export default function CartPage() {
     }
   };
 
-  // ── SUCCESS ──────────────────────────────────────────────────
+  // ── SUCCESS ────────────────────────────────────────────────────
   if (step === "success") return (
     <div className="cp-success">
       <div className="cp-success-icon">🎉</div>
       <h2 className="cp-success-title">Buyurtma qabul qilindi!</h2>
       <p className="cp-success-sub">Tez orada siz bilan bog'lanamiz.</p>
-      <button className="cp-success-btn" onClick={() => navigate("/")}>
-        Menyuga qaytish
-      </button>
+      <button className="cp-success-btn" onClick={() => navigate("/")}>Menyuga qaytish</button>
+      <button className="cp-continue-btn" style={{ marginTop: 8, borderRadius: 14, padding: "12px 24px" }}
+        onClick={() => navigate("/profile")}>📋 Buyurtmalarimni ko'rish</button>
     </div>
   );
 
   return (
     <div className="cp-root">
-
       {/* HEADER */}
       <div className="cp-header">
-        <button
-          className="cp-back-btn"
-          onClick={() => step === "form" ? setStep("cart") : navigate(-1)}
-        >
+        <button className="cp-back-btn"
+          onClick={() => step === "form" ? setStep("cart") : navigate(-1)}>
           ← Orqaga
         </button>
         <span className="cp-header-title">
           {step === "cart" ? `Savat (${totalItems} ta)` : "Buyurtma ma'lumotlari"}
         </span>
-        <div style={{ width: 80 }} />
+        <button className="cp-back-btn" onClick={() => navigate("/profile")} title="Profil">
+          👤
+        </button>
       </div>
 
-      {/* ── CART STEP ─────────────────────────────────────────── */}
+      {/* ── CART STEP ──────────────────────────────────────────────── */}
       {step === "cart" && (
         <div className="cp-body">
           {cart.length === 0 ? (
@@ -140,9 +139,7 @@ export default function CartPage() {
               <div className="cp-empty-icon">🛒</div>
               <p className="cp-empty-title">Savat bo'sh</p>
               <p className="cp-empty-sub">Taomlardan birini tanlang</p>
-              <button className="cp-empty-btn" onClick={() => navigate("/")}>
-                Menyuga o'tish
-              </button>
+              <button className="cp-empty-btn" onClick={() => navigate("/")}>Menyuga o'tish</button>
             </div>
           ) : (
             <>
@@ -151,8 +148,7 @@ export default function CartPage() {
                   <div key={item._id} className="cp-item">
                     <img
                       src={item.image?.startsWith("http") ? item.image : `${API}${item.image}`}
-                      alt={item.title}
-                      className="cp-item-img"
+                      alt={item.title} className="cp-item-img"
                       onError={e => e.target.src = "https://placehold.co/80/e8f5ee/1d6b3e?text=+"}
                     />
                     <div className="cp-item-info">
@@ -165,22 +161,13 @@ export default function CartPage() {
                         <span>{item.qty}</span>
                         <button onClick={() => changeQty(item._id, 1)}>+</button>
                       </div>
-                      <p className="cp-item-total">
-                        {(item.price * item.qty).toLocaleString()} so'm
-                      </p>
-                      <button
-                        className="cp-item-remove"
-                        onClick={() => removeItem(item._id)}
-                        title="O'chirish"
-                      >
-                        🗑
-                      </button>
+                      <p className="cp-item-total">{(item.price * item.qty).toLocaleString()} so'm</p>
+                      <button className="cp-item-remove" onClick={() => removeItem(item._id)}>🗑</button>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* TOTAL */}
               <div className="cp-total-block">
                 <div className="cp-total-row">
                   <span>Mahsulotlar ({totalItems} ta)</span>
@@ -205,59 +192,68 @@ export default function CartPage() {
         </div>
       )}
 
-      {/* ── FORM STEP ─────────────────────────────────────────── */}
+      {/* ── FORM STEP ──────────────────────────────────────────────── */}
       {step === "form" && (
         <div className="cp-body">
           <form className="cp-form" onSubmit={handleOrder}>
 
-            {/* Buyurtma xulosa */}
             <div className="cp-order-summary">
               <p className="cp-summary-label">📋 Buyurtma</p>
               <div className="cp-summary-items">
                 {cart.map(i => (
-                  <span key={i._id} className="cp-summary-chip">
-                    {i.title} × {i.qty}
-                  </span>
+                  <span key={i._id} className="cp-summary-chip">{i.title} × {i.qty}</span>
                 ))}
               </div>
-              <p className="cp-summary-total">
-                Jami: <strong>{totalPrice.toLocaleString()} so'm</strong>
-              </p>
+              <p className="cp-summary-total">Jami: <strong>{totalPrice.toLocaleString()} so'm</strong></p>
             </div>
 
             <div className="cp-form-section-title">👤 Shaxsiy ma'lumotlar</div>
 
             <div className="cp-form-field">
               <label>Ismingiz *</label>
-              <input
-                type="text"
-                placeholder="Isim Familiya"
-                required
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-              />
+              <input type="text" placeholder="Isim Familiya" required
+                value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
 
             <div className="cp-form-field">
               <label>Telefon raqam *</label>
-              <input
-                type="tel"
-                placeholder="+998 90 000 00 00"
-                required
-                value={form.phone}
-                onChange={e => setForm({ ...form, phone: e.target.value })}
-              />
+              <input type="tel" placeholder="+998 90 000 00 00" required
+                value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
             </div>
 
             <div className="cp-form-section-title">📍 Yetkazib berish manzili</div>
 
+            {/* Saqlangan manzillar */}
+            {savedAddresses.length > 0 && (
+              <div>
+                <button type="button"
+                  className={`cp-gps-btn ${showAddrPicker ? "active" : ""}`}
+                  onClick={() => setShowAddrPicker(!showAddrPicker)}>
+                  📋 Saqlangan manzillardan tanlash ({savedAddresses.length} ta)
+                </button>
+                {showAddrPicker && (
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {savedAddresses.map(addr => (
+                      <button key={addr.id} type="button"
+                        onClick={() => { setForm(f => ({ ...f, address: addr.address })); setShowAddrPicker(false); }}
+                        style={{
+                          textAlign: "left", padding: "12px 14px",
+                          background: form.address === addr.address ? "#d1fae5" : "white",
+                          border: `2px solid ${form.address === addr.address ? "var(--g)" : "#d4e8da"}`,
+                          borderRadius: 12, cursor: "pointer", transition: "all 0.2s"
+                        }}>
+                        <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--g4)" }}>📍 {addr.label}</div>
+                        <div style={{ fontSize: "0.8rem", color: "var(--gray)", marginTop: 3 }}>{addr.address}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* GPS tugmasi */}
-            <button
-              type="button"
-              className={`cp-gps-btn ${location ? "active" : ""}`}
-              onClick={getLocation}
-              disabled={locationLoading}
-            >
+            <button type="button" className={`cp-gps-btn ${location ? "active" : ""}`}
+              onClick={getLocation} disabled={locationLoading}>
               {locationLoading
                 ? <><span className="cp-gps-spin">⏳</span> GPS aniqlanmoqda...</>
                 : location
@@ -266,41 +262,23 @@ export default function CartPage() {
               }
             </button>
 
-            {/* Yandex xarita havolasi */}
             {location && (
-              <a
-                href={`https://yandex.com/maps/?pt=${location.lng},${location.lat}&z=16&l=map`}
-                target="_blank"
-                rel="noreferrer"
-                className="cp-map-link"
-              >
+              <a href={`https://yandex.com/maps/?pt=${location.lng},${location.lat}&z=16&l=map`}
+                target="_blank" rel="noreferrer" className="cp-map-link">
                 🗺 Yandex xaritada ko'rish →
               </a>
             )}
 
-            {locationError && (
-              <p className="cp-location-error">⚠️ {locationError}</p>
-            )}
+            {locationError && <p className="cp-location-error">⚠️ {locationError}</p>}
 
             <div className="cp-form-field">
               <label>To'liq manzil *</label>
-              <input
-                type="text"
-                required
-                placeholder="Ko'cha, uy raqami, kvartira..."
-                value={form.address}
-                onChange={e => setForm({ ...form, address: e.target.value })}
-              />
-              <span className="cp-field-hint">
-                GPS bosganingizda avtomatik to'ldiriladi
-              </span>
+              <input type="text" required placeholder="Ko'cha, uy raqami, kvartira..."
+                value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
+              <span className="cp-field-hint">GPS bosganingizda yoki saqlangandan avtomatik to'ldiriladi</span>
             </div>
 
-            <button
-              type="submit"
-              className="cp-submit-btn"
-              disabled={orderLoading}
-            >
+            <button type="submit" className="cp-submit-btn" disabled={orderLoading}>
               {orderLoading
                 ? <><span className="cp-gps-spin">⏳</span> Yuborilmoqda...</>
                 : "✅ Buyurtmani tasdiqlash"

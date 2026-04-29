@@ -5,11 +5,9 @@ import "./App.css";
 const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 const CAT_EMOJI = {
-  "fast food": "🍔", "burger": "🍔", "pizza": "🍕",
-  "salat": "🥗", "salatlar": "🥗", "desert": "🍦", "desertlar": "🍦",
-  "ichimliklar": "🥤", "napitkala": "🥤", "sho'rvalar": "🍲",
-  "hamir ovqat": "🥟", "grill": "🔥", "quyuq ovqat": "🍛",
-  "default": "🍽"
+  "fast food":"🍔","burger":"🍔","pizza":"🍕","salat":"🥗","salatlar":"🥗",
+  "desert":"🍦","desertlar":"🍦","ichimliklar":"🥤","napitkala":"🥤",
+  "sho'rvalar":"🍲","hamir ovqat":"🥟","grill":"🔥","quyuq ovqat":"🍛","default":"🍽"
 };
 const getEmoji = (cat) => CAT_EMOJI[cat?.toLowerCase()] || CAT_EMOJI.default;
 
@@ -26,6 +24,7 @@ export default function FoodDetail() {
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const [cartCount, setCartCount] = useState(() => getCart().reduce((s, i) => s + i.qty, 0));
 
   useEffect(() => {
@@ -51,12 +50,9 @@ export default function FoodDetail() {
   const handleAdd = () => {
     const cart = getCart();
     const exists = cart.find(i => i._id === food._id);
-    let newCart;
-    if (exists) {
-      newCart = cart.map(i => i._id === food._id ? { ...i, qty } : i);
-    } else {
-      newCart = [...cart, { ...food, qty }];
-    }
+    const newCart = exists
+      ? cart.map(i => i._id === food._id ? { ...i, qty } : i)
+      : [...cart, { ...food, qty }];
     saveCart(newCart);
     setCartCount(newCart.reduce((s, i) => s + i.qty, 0));
     setAdded(true);
@@ -79,40 +75,47 @@ export default function FoodDetail() {
   );
 
   const totalSum = food.price * qty;
+  const imgSrc = imgError
+    ? `https://placehold.co/800x400/e8f5ee/1d6b3e?text=${encodeURIComponent(food.title)}`
+    : (food.image?.startsWith("http") ? food.image : `${API}${food.image}`);
 
   return (
     <div className="fd-root">
       {/* HEADER */}
       <div className="fd-header">
         <button className="fd-back-btn-header" onClick={() => navigate(-1)}>← Orqaga</button>
-        <span className="fd-header-title">{food.title}</span>
+        <span className="fd-header-title" style={{ flex:1, textAlign:"center" }}>{food.title}</span>
         {cartCount > 0 ? (
           <button className="fd-cart-btn" onClick={() => navigate("/cart")}>
             🛒 <span className="fd-cart-btn-count">{cartCount}</span>
           </button>
-        ) : <div style={{ width: 60 }} />}
+        ) : <div style={{ width: 56 }} />}
       </div>
 
-      {/* IMAGE — kichikroq, chiroyli */}
+      {/* IMAGE */}
       <div className="fd-img-wrap">
-        <img
-          src={food.image?.startsWith("http") ? food.image : `${API}${food.image}`}
-          alt={food.title} className="fd-img"
-          onError={e => { e.target.onerror = null; e.target.src = "https://placehold.co/800x400/e8f5ee/1d6b3e?text=Rasm+yo%27q"; }}
-        />
+        {!imgError ? (
+          <img
+            src={imgSrc}
+            alt={food.title}
+            className="fd-img"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="fd-img-placeholder">
+            <span>{getEmoji(food.category)}</span>
+            <p>{food.title}</p>
+          </div>
+        )}
         <div className="fd-img-overlay" />
         <div className="fd-cat-badge">{getEmoji(food.category)} {food.category}</div>
       </div>
 
-      {/* CONTENT CARD */}
+      {/* CONTENT */}
       <div className="fd-content">
         <div className="fd-card">
-          <div className="fd-card-top">
-            <div>
-              <h1 className="fd-title">{food.title}</h1>
-              <div className="fd-price">{food.price?.toLocaleString()} so'm</div>
-            </div>
-          </div>
+          <h1 className="fd-title">{food.title}</h1>
+          <div className="fd-price">{food.price?.toLocaleString()} so'm</div>
 
           {food.description && (
             <>

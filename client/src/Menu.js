@@ -19,6 +19,8 @@ const saveCart = (cart) => {
   window.dispatchEvent(new Event("cartUpdated"));
 };
 const getProfile = () => { try { return JSON.parse(localStorage.getItem("profile") || "null"); } catch { return null; } };
+const getLang = () => localStorage.getItem("lang") || "uz";
+const setLangStore = (l) => { localStorage.setItem("lang", l); window.dispatchEvent(new Event("langChanged")); };
 
 export default function Menu() {
   const [foods, setFoods] = useState([]);
@@ -29,11 +31,20 @@ export default function Menu() {
   const [cart, setCart] = useState(getCart);
   const [banner, setBanner] = useState(null);
   const [profile, setProfile] = useState(getProfile);
+  const [lang, setLang] = useState(getLang);
   const catRefs = useRef({});
   const navigate = useNavigate();
 
   const cartCount = cart.reduce((t, i) => t + i.qty, 0);
   const cartTotal = cart.reduce((t, i) => t + i.price * i.qty, 0);
+
+  // Til matnlari
+  const T = {
+    uz: { search: "Taom qidiring...", delivery: "Tez yetkazib berish", goCart: "Savatga o'tish →" },
+    ru: { search: "Поиск блюд...", delivery: "Быстрая доставка", goCart: "В корзину →" },
+    en: { search: "Search food...", delivery: "Fast delivery", goCart: "Go to cart →" },
+  };
+  const t = T[lang] || T.uz;
 
   useEffect(() => {
     Promise.all([
@@ -53,13 +64,17 @@ export default function Menu() {
 
     const onCartUpdate = () => setCart(getCart());
     const onProfileUpdate = () => setProfile(getProfile());
+    const onLangChange = () => setLang(getLang());
+
     window.addEventListener("cartUpdated", onCartUpdate);
     window.addEventListener("storage", onCartUpdate);
     window.addEventListener("profileUpdated", onProfileUpdate);
+    window.addEventListener("langChanged", onLangChange);
     return () => {
       window.removeEventListener("cartUpdated", onCartUpdate);
       window.removeEventListener("storage", onCartUpdate);
       window.removeEventListener("profileUpdated", onProfileUpdate);
+      window.removeEventListener("langChanged", onLangChange);
     };
   }, []);
 
@@ -93,7 +108,8 @@ export default function Menu() {
     saveCart(newCart);
   };
 
-  // Profil initials
+  const changeLang = (l) => { setLang(l); setLangStore(l); };
+
   const initials = profile?.name
     ? profile.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)
     : null;
@@ -104,7 +120,7 @@ export default function Menu() {
         <div className="g-spinner-ring" />
         <span className="g-spinner-emoji">🍃</span>
       </div>
-      <p className="g-loading-text">Menyu yuklanmoqda...</p>
+      <p className="g-loading-text">Yuklanmoqda...</p>
     </div>
   );
 
@@ -117,25 +133,36 @@ export default function Menu() {
             <span className="g-logo-leaf">🍃</span>
             <div>
               <div className="g-logo-name">FreshBite</div>
-              <div className="g-logo-sub">Tez yetkazib berish</div>
+              <div className="g-logo-sub">{t.delivery}</div>
             </div>
           </div>
 
-          {/* RIGHT ICONS */}
+          {/* RIGHT ACTIONS */}
           <div className="g-header-actions">
+            {/* Til tanlash */}
+            <div className="pf-lang-switcher">
+              {["uz", "ru", "en"].map(l => (
+                <button key={l}
+                  className={`pf-lang-btn ${lang === l ? "active" : ""}`}
+                  onClick={() => changeLang(l)}>
+                  {l.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
             {/* Buyurtmam holati */}
-            <button className="g-orders-btn" onClick={() => navigate("/orders")} title="Buyurtmam holati">
+            <button className="g-orders-btn" onClick={() => navigate("/orders")} title="Buyurtmam">
               📦
             </button>
 
-            {/* Profil tugmasi */}
+            {/* Profil */}
             {initials ? (
               <button className="g-profile-btn" onClick={() => navigate("/profile")} title="Profil">
                 {initials}
               </button>
             ) : (
-              <button className="g-login-btn" onClick={() => navigate("/login-user")} title="Kirish">
-                Kirish
+              <button className="g-login-btn" onClick={() => navigate("/login-user")}>
+                {lang === "uz" ? "Kirish" : lang === "ru" ? "Войти" : "Login"}
               </button>
             )}
 
@@ -150,7 +177,7 @@ export default function Menu() {
         {/* SEARCH */}
         <div className="g-search-bar">
           <span>🔍</span>
-          <input className="g-search-input" placeholder="Taom qidiring..."
+          <input className="g-search-input" placeholder={t.search}
             value={search} onChange={e => setSearch(e.target.value)} />
           {search && <button className="g-search-clear" onClick={() => setSearch("")}>✕</button>}
         </div>
@@ -175,9 +202,9 @@ export default function Menu() {
       {/* FLOATING CART */}
       {cartCount > 0 && (
         <div className="g-float-cart" onClick={() => navigate("/cart")}>
-          <span className="g-float-cart-text">🛒 {cartCount} ta mahsulot</span>
+          <span className="g-float-cart-text">🛒 {cartCount} ta</span>
           <span className="g-float-cart-price">{cartTotal.toLocaleString()} so'm</span>
-          <span className="g-float-cart-btn">Savatga o'tish →</span>
+          <span className="g-float-cart-btn">{t.goCart}</span>
         </div>
       )}
 
@@ -185,7 +212,7 @@ export default function Menu() {
       {search ? (
         <main className="g-main">
           <div className="g-section-title">
-            <span>🔍 "{search}" bo'yicha natijalar ({filteredFoods.length})</span>
+            <span>🔍 "{search}" ({filteredFoods.length})</span>
           </div>
           <div className="g-grid">
             {filteredFoods.length === 0
@@ -200,7 +227,6 @@ export default function Menu() {
       ) : (
         <main className="g-main">
           <HeroBanner banner={banner} />
-
           {categories.map(cat => (
             <div key={cat} className="g-cat-section" ref={el => catRefs.current[cat] = el}>
               <div className="g-section-header">
@@ -223,7 +249,6 @@ export default function Menu() {
   );
 }
 
-// ── HERO BANNER ──────────────────────────────────────────────────────────────
 function HeroBanner({ banner }) {
   const b = banner || {
     title: "Mazali taomlar", subtitle: "eshigingizgacha 🚀",
@@ -257,8 +282,7 @@ function HeroBanner({ banner }) {
             {b.events.map(ev => (
               <span key={ev.id} style={{
                 background: "rgba(255,255,255,0.18)", color: "white",
-                padding: "4px 12px", borderRadius: 20, fontSize: "0.82rem",
-                fontWeight: 700, backdropFilter: "blur(4px)"
+                padding: "4px 12px", borderRadius: 20, fontSize: "0.82rem", fontWeight: 700
               }}>{ev.emoji} {ev.label}</span>
             ))}
           </div>
@@ -274,19 +298,24 @@ function HeroBanner({ banner }) {
   );
 }
 
-// ── FOOD CARD ────────────────────────────────────────────────────────────────
 function FoodCard({ food, index, cart, onOpen, onAdd, onChangeQty }) {
   const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const [imgErr, setImgErr] = useState(false);
   const inCart = cart.find(i => i._id === food._id);
+  const imgSrc = imgErr
+    ? null
+    : (food.image?.startsWith("http") ? food.image : `${API}${food.image}`);
+
   return (
     <div className="g-card" style={{ animationDelay: `${index * 0.06}s` }} onClick={onOpen}>
       <div className="g-card-img-wrap">
-        <img
-          src={food.image?.startsWith("http") ? food.image : `${API}${food.image}`}
-          alt={food.title} className="g-card-img"
-          onError={e => e.target.src = "https://placehold.co/300x200/e8f5ee/1d6b3e?text=Rasm"}
-        />
-        {inCart && <span className="g-card-in-cart">✓ {inCart.qty} ta</span>}
+        {imgSrc && !imgErr ? (
+          <img src={imgSrc} alt={food.title} className="g-card-img"
+            onError={() => setImgErr(true)} />
+        ) : (
+          <div className="g-card-img-placeholder">🍽</div>
+        )}
+        {inCart && <span className="g-card-in-cart">✓ {inCart.qty}</span>}
       </div>
       <div className="g-card-body">
         <h3 className="g-card-title">{food.title}</h3>
@@ -300,7 +329,7 @@ function FoodCard({ food, index, cart, onOpen, onAdd, onChangeQty }) {
               <button className="g-card-qty-btn plus" onClick={e => onChangeQty(food._id, +1, e)}>+</button>
             </div>
           ) : (
-            <button className="g-card-add-btn" onClick={e => onAdd(food, e)} title="Savatga qo'shish">+</button>
+            <button className="g-card-add-btn" onClick={e => onAdd(food, e)}>+</button>
           )}
         </div>
       </div>

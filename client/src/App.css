@@ -498,3 +498,62 @@ body { font-family: 'Outfit', sans-serif; background: #f2f7f2; color: #0f1f0f; -
 .banner-preview-desc { font-size:0.82rem; color:rgba(255,255,255,0.7); margin-top:5px; }
 .banner-preview-events { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
 .banner-preview-event { background:rgba(255,255,255,0.2); color:white; padding:4px 10px; border-radius:20px; font-size:0.76rem; font-weight:700; }
+
+/* ════ TIL TANLASH + TELEFON ════════════════════════════════ */
+.pf-lang-switcher {
+  display: flex;
+  gap: 4px;
+  background: var(--g3);
+  border-radius: 10px;
+  padding: 4px;
+}
+.pf-lang-btn {
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  color: var(--gray);
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.18s;
+}
+.pf-lang-btn.active {
+  background: var(--g);
+  color: white;
+}
+.pf-lang-btn:hover:not(.active) { background: #d0ecd8; color: var(--g4); }
+
+/* Telefon input +998 prefix bilan */
+.pf-phone-wrap {
+  display: flex;
+  align-items: center;
+  border: 2px solid #d4e8da;
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+  transition: border-color 0.2s;
+}
+.pf-phone-wrap:focus-within { border-color: var(--g); }
+.pf-phone-prefix {
+  padding: 12px 12px 12px 14px;
+  background: var(--g3);
+  color: var(--g4);
+  font-weight: 800;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  border-right: 2px solid #d4e8da;
+  font-family: 'Outfit', sans-serif;
+}
+.pf-phone-input {
+  flex: 1;
+  padding: 12px 14px;
+  border: none !important;
+  outline: none !important;
+  font-size: 1rem;
+  font-family: 'Outfit', sans-serif;
+  background: transparent;
+  color: var(--g4);
+  letter-spacing: 1px;
+}

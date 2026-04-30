@@ -1,32 +1,29 @@
 const mongoose = require("mongoose");
 
-const foodSchema = new mongoose.Schema(
-  {
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    price: {
-      type: Number,
-      required: true,
-    },
-    image: {
-      type: String,
-      required: true,
-    },
-    category: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    description: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+const FoodSchema = new mongoose.Schema({
+  // Ko'p tilli nom va tavsif
+  title: {
+    uz: { type: String, required: true },
+    ru: { type: String, default: "" },
+    en: { type: String, default: "" },
   },
-  { timestamps: true }
-);
+  price:    { type: Number, required: true },
+  category: {
+    uz: { type: String, required: true },
+    ru: { type: String, default: "" },
+    en: { type: String, default: "" },
+  },
+  description: {
+    uz: { type: String, default: "" },
+    ru: { type: String, default: "" },
+    en: { type: String, default: "" },
+  },
+  image: { type: String, default: "" },
+}, { timestamps: true });
 
-module.exports = mongoose.model("Food", foodSchema);
+// Virtual: tanlangan tilda nom
+FoodSchema.methods.getTitle = function(lang = "uz") {
+  return this.title[lang] || this.title.uz || "";
+};
+
+module.exports = mongoose.model("Food", FoodSchema);

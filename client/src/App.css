@@ -689,3 +689,37 @@ input, textarea, select, button { font-family: 'Outfit', sans-serif; }
   background: linear-gradient(135deg, #e8f5ee, #c8e8d4);
   font-size: 2.8rem;
 }
+
+/* ─── ORDER TYPE CARDS ─────────────────────────────────────── */
+.order-type-card {
+  display: flex; align-items: center; gap: 14px;
+  background: white; border: 2px solid var(--g3);
+  border-radius: 16px; padding: 16px 18px;
+  cursor: pointer; transition: all 0.2s;
+}
+.order-type-card:hover { border-color: var(--accent); background: #f9fefb; }
+.order-type-card.selected { border-color: var(--g); background: #f0fdf4; }
+.order-type-icon { font-size: 2rem; flex-shrink: 0; }
+.order-type-info { flex: 1; }
+.order-type-title { font-size: 1rem; font-weight: 800; color: var(--g4); }
+.order-type-desc { font-size: 0.82rem; color: var(--gray); margin-top: 2px; }
+.order-type-check {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid var(--g3); display: flex;
+  align-items: center; justify-content: center;
+  font-size: 0.9rem; font-weight: 900;
+  color: transparent; background: white;
+  transition: all 0.2s; flex-shrink: 0;
+}
+.order-type-check.active { background: var(--g); border-color: var(--g); color: white; }
+
+/* ─── PAYMENT CARDS ────────────────────────────────────────── */
+.payment-card {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; padding: 16px 10px;
+  background: white; border: 2px solid var(--g3);
+  border-radius: 16px; cursor: pointer; transition: all 0.2s;
+}
+.payment-card:hover { border-color: var(--accent); background: #f9fefb; }
+.payment-card.selected { border-color: var(--g); background: #f0fdf4; }
+.payment-label { font-size: 0.85rem; font-weight: 800; color: var(--g4); text-align: center; }

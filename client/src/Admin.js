@@ -1,8 +1,14 @@
 import { useEffect, useState, useRef } from "react";
+import { LOGO_WHITE } from "./i18n";
 
 const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-const compressImage = (file, maxWidth = 1200, quality = 0.82) => new Promise((resolve) => {
+const compressImage = (file, maxWidth = 1920, quality = 0.92) => new Promise((resolve) => {
+  // Agar fayl 2MB dan kichik bo'lsa — compress qilmasdan qaytarish
+  if (file.size < 2 * 1024 * 1024) {
+    resolve(file);
+    return;
+  }
   const reader = new FileReader();
   reader.readAsDataURL(file);
   reader.onload = (e) => {
@@ -11,10 +17,26 @@ const compressImage = (file, maxWidth = 1200, quality = 0.82) => new Promise((re
     img.onload = () => {
       const canvas = document.createElement("canvas");
       let { width, height } = img;
-      if (width > maxWidth) { height = Math.round(height * maxWidth / width); width = maxWidth; }
-      canvas.width = width; canvas.height = height;
+      // Faqat juda katta rasmlarni kichiklashtirish
+      if (width > maxWidth) {
+        height = Math.round(height * maxWidth / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      canvas.toBlob((blob) => resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" })), "image/jpeg", quality);
+      canvas.toBlob(
+        (blob) => {
+          // Agar compress qilingan fayl originaldan KATTA bo'lsa — originalini qaytarish
+          if (blob.size > file.size) {
+            resolve(file);
+          } else {
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
+          }
+        },
+        "image/jpeg",
+        quality
+      );
     };
   };
 });
@@ -151,6 +173,9 @@ export default function Admin() {
     try {
       const compressed = await compressImage(file);
       setImageFile(compressed);
+      const beforeKB = Math.round(file.size / 1024);
+      const afterKB = Math.round(compressed.size / 1024);
+      console.log(`Rasm: ${beforeKB}KB → ${afterKB}KB`);
       const reader = new FileReader();
       reader.onload = ev => setImagePreview(ev.target.result);
       reader.readAsDataURL(compressed);
@@ -179,7 +204,7 @@ export default function Admin() {
     try {
       const body = {
         title_uz: titles.uz, title_ru: titles.ru || titles.uz, title_en: titles.en || titles.uz,
-        price: String(price),
+        price: String(Number(price) || 0),
         category_uz: selectedCat.uz, category_ru: selectedCat.ru || selectedCat.uz, category_en: selectedCat.en || selectedCat.uz,
         desc_uz: descs.uz, desc_ru: descs.ru, desc_en: descs.en,
         imageUrl: uploadedUrl || undefined,
@@ -274,7 +299,10 @@ export default function Admin() {
   return (
     <div className="admin-root">
       <div className="admin-topbar">
-        <div className="admin-logo">🍃 Admin Panel</div>
+        <div className="admin-logo" style={{display:"flex",alignItems:"center",gap:10}}>
+          <img src={LOGO_WHITE} alt="Yalpiz" className="admin-logo-img" />
+          <span style={{fontSize:"0.9rem",fontWeight:700,opacity:0.9}}>Admin Panel</span>
+        </div>
         <div className="admin-user-info">
           <span className="admin-username">{savedUser.username}</span>
           <span className="admin-role-badge">{savedUser.role}</span>
@@ -396,7 +424,9 @@ export default function Admin() {
 
                   {uploadedUrl && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, padding: "8px 12px", background: "#d1fae5", borderRadius: 10 }}>
-                      <span style={{ fontSize: "0.85rem", color: "#065f46", fontWeight: 700 }}>✅ Rasm yuklandi!</span>
+                      <span style={{ fontSize: "0.85rem", color: "#065f46", fontWeight: 700 }}>
+                        ✅ Rasm yuklandi! {imageFile && `(${Math.round(imageFile.size/1024)} KB)`}
+                      </span>
                       <button type="button" onClick={() => { setUploadedUrl(""); setImagePreview(null); setImageFile(null); }}
                         style={{ background: "none", border: "none", cursor: "pointer", color: "#e53e3e", fontSize: 18 }}>✕</button>
                     </div>

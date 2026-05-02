@@ -159,7 +159,7 @@ app.post("/api/foods", auth, async (req, res) => {
 
     const food = await new Food({
       title: { uz: title_uz, ru: title_ru || title_uz, en: title_en || title_uz },
-      price: Number(price),
+      price: parseFloat(String(price).replace(/[^0-9.]/g,'')) || 0,
       category: { uz: category_uz, ru: category_ru || category_uz, en: category_en || category_uz },
       description: { uz: desc_uz || "", ru: desc_ru || "", en: desc_en || "" },
       image: imageUrl,
@@ -172,7 +172,7 @@ app.put("/api/foods/:id", auth, async (req, res) => {
   try {
     const { title_uz, title_ru, title_en, price, category_uz, category_ru, category_en, desc_uz, desc_ru, desc_en, imageUrl } = req.body;
     const update = {
-      price: Number(price),
+      price: parseFloat(String(price).replace(/[^0-9.]/g,'')) || 0,
       title: { uz: title_uz, ru: title_ru || title_uz, en: title_en || title_uz },
       category: { uz: category_uz, ru: category_ru || category_uz, en: category_en || category_uz },
       description: { uz: desc_uz || "", ru: desc_ru || "", en: desc_en || "" },

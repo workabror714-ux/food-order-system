@@ -29,7 +29,8 @@ export default function Menu() {
   const [search, setSearch] = useState("");
   const [visible, setVisible] = useState(false);
   const [cart, setCart] = useState(getCart);
-  const [banner, setBanner] = useState(null);
+  const [banner, setBanner] = useState([]);
+  const [activeBanner, setActiveBanner] = useState(0);
   const [profile, setProfile] = useState(getProfile);
   const [lang, setLang] = useState(getLang);
   const catRefs = useRef({});
@@ -41,7 +42,7 @@ export default function Menu() {
   useEffect(() => {
     Promise.all([
       fetch(`${API}/api/foods`).then(r => r.json()),
-      fetch(`${API}/api/banner`).then(r => r.json()).catch(() => null),
+      fetch(`${API}/api/banners`).then(r => r.json()).catch(() => []),
     ]).then(([fd, bd]) => {
       const arr = Array.isArray(fd) ? fd : [];
       setFoods(arr);
@@ -49,7 +50,7 @@ export default function Menu() {
         const first = arr[0].category;
         setActiveCategory(typeof first === "object" ? first.uz : first);
       }
-      if (bd) setBanner(bd);
+      if (bd && bd.length > 0) setBanner(bd);
       setLoading(false);
       setTimeout(() => setVisible(true), 50);
     }).catch(() => setLoading(false));
@@ -170,7 +171,7 @@ export default function Menu() {
         </main>
       ) : (
         <main className="g-main">
-          <HeroBanner banner={banner} t={t} foods={foods} />
+          <HeroBanner banners={banner} t={t} foods={foods} />
           {categoriesRaw.map((cat, idx) => {
             const key = getCatKey(cat);
             return (
@@ -221,28 +222,77 @@ function BottomNav({ active, cartCount, navigate }) {
   );
 }
 
-function HeroBanner({ banner, t, foods }) {
-  const b = banner || { title: t.menuTitle, subtitle: t.menuSubtitle, description: t.menuDesc, bgColor: "#1a5c30", mediaType: "none", mediaUrl: "", events: [] };
+function HeroBanner({ banners, t, foods }) {
+  const [active, setActive] = useState(0);
+
+  // Auto-slide
+  useEffect(() => {
+    if (!banners || banners.length <= 1) return;
+    const timer = setInterval(() => setActive(a => (a + 1) % banners.length), 4000);
+    return () => clearInterval(timer);
+  }, [banners]);
+
+  if (!banners || banners.length === 0) {
+    banners = [{ _id:"default", title: t.menuTitle, subtitle: t.menuSubtitle, description: t.menuDesc, bgColor: "#1a5c30", mediaType: "none", mediaUrl: "", events: [] }];
+  }
+
+  const b = banners[active] || banners[0];
+
   return (
-    <div className="g-hero" style={{ background: b.bgColor, position: "relative", overflow: "hidden" }}>
-      {b.mediaType === "image" && b.mediaUrl && <img src={b.mediaUrl} alt="banner" style={{ position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:0.25,zIndex:0 }} />}
-      {b.mediaType === "video" && b.mediaUrl && <video autoPlay muted loop playsInline style={{ position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:0.25,zIndex:0 }}><source src={b.mediaUrl} /></video>}
-      <div style={{ position:"absolute",bottom:0,left:0,right:0,height:3,background:"rgba(163,212,91,0.5)",zIndex:1 }} />
-      <div style={{ position:"relative",zIndex:2,flex:1 }}>
-        <img src={LOGO_WHITE} alt="Yalpiz" style={{ height:32,width:"auto",maxWidth:140,objectFit:"contain",marginBottom:8,filter:"drop-shadow(0 1px 3px rgba(0,0,0,0.2))" }} />
-        <h1 className="g-hero-title">{b.title}<br /><span className="g-hero-accent">{b.subtitle}</span></h1>
-        <p className="g-hero-desc">{b.description}</p>
-        {b.events?.length > 0 && (
-          <div style={{ display:"flex",flexWrap:"wrap",gap:8,marginTop:10 }}>
-            {b.events.map(ev => <span key={ev.id} style={{ background:"rgba(255,255,255,0.15)",color:"white",padding:"4px 12px",borderRadius:20,fontSize:"0.82rem",fontWeight:700 }}>{ev.emoji} {ev.label}</span>)}
-          </div>
+    <div style={{ marginBottom: 22 }}>
+      {/* BANNER SLIDE */}
+      <div className="g-hero" style={{ background: b.bgColor, position: "relative", overflow: "hidden", transition: "background 0.4s" }}>
+        {b.mediaType === "image" && b.mediaUrl && (
+          <img src={b.mediaUrl} alt="banner" style={{ position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:0.35,zIndex:0 }} />
         )}
+        {b.mediaType === "video" && b.mediaUrl && (
+          <video autoPlay muted loop playsInline style={{ position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:0.35,zIndex:0 }}>
+            <source src={b.mediaUrl} />
+          </video>
+        )}
+        <div style={{ position:"absolute",bottom:0,left:0,right:0,height:3,background:"rgba(163,212,91,0.5)",zIndex:1 }} />
+
+        <div style={{ position:"relative",zIndex:2,flex:1 }}>
+          <img src={LOGO_WHITE} alt="Yalpiz" style={{ height:28,width:"auto",maxWidth:120,objectFit:"contain",marginBottom:8,filter:"drop-shadow(0 1px 3px rgba(0,0,0,0.3))",opacity:0.92 }} />
+          <h1 className="g-hero-title">{b.title}<br /><span className="g-hero-accent">{b.subtitle}</span></h1>
+          {b.description && <p className="g-hero-desc">{b.description}</p>}
+          {b.events?.length > 0 && (
+            <div style={{ display:"flex",flexWrap:"wrap",gap:8,marginTop:10 }}>
+              {b.events.map(ev => (
+                <span key={ev.id} style={{ background:"rgba(255,255,255,0.18)",color:"white",padding:"4px 12px",borderRadius:20,fontSize:"0.8rem",fontWeight:700 }}>
+                  {ev.emoji} {ev.label}
+                </span>
+              ))}
+            </div>
+          )}
+          {b.buttonText && (
+            <button style={{ marginTop:12,background:"white",color:b.bgColor,border:"none",borderRadius:20,padding:"8px 18px",fontWeight:800,fontSize:"0.85rem",cursor:"pointer" }}>
+              {b.buttonText}
+            </button>
+          )}
+        </div>
+
+        <div className="g-hero-stats" style={{ position:"relative",zIndex:2 }}>
+          <div className="g-stat"><span className="g-stat-num">{foods.length}+</span><span className="g-stat-label">{t.pieces}</span></div>
+          <div className="g-stat-divider" />
+          <div className="g-stat"><span className="g-stat-num">30'</span><span className="g-stat-label">{t.deliveryTime}</span></div>
+        </div>
       </div>
-      <div className="g-hero-stats" style={{ position:"relative",zIndex:2 }}>
-        <div className="g-stat"><span className="g-stat-num">{foods.length}+</span><span className="g-stat-label">{t.pieces}</span></div>
-        <div className="g-stat-divider" />
-        <div className="g-stat"><span className="g-stat-num">30'</span><span className="g-stat-label">{t.deliveryTime}</span></div>
-      </div>
+
+      {/* DOTS - faqat 2+ banner bo'lsa */}
+      {banners.length > 1 && (
+        <div style={{ display:"flex",justifyContent:"center",gap:6,marginTop:10 }}>
+          {banners.map((_, i) => (
+            <button key={i} onClick={() => setActive(i)}
+              style={{
+                width: i === active ? 22 : 8, height: 8,
+                borderRadius: 20, border:"none",cursor:"pointer",
+                background: i === active ? "var(--g)" : "var(--border)",
+                transition:"all 0.3s", padding:0
+              }} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

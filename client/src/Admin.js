@@ -88,15 +88,15 @@ export default function Admin() {
   const [newRole, setNewRole] = useState("admin");
   const [admins, setAdmins] = useState([]);
 
-  // Banner
-  const [banner, setBanner] = useState({
-    title: "Mazali taomlar", subtitle: "eshigingizgacha 🚀",
-    description: "Yangi, tez va arzon yetkazib berish",
-    mediaUrl: "", mediaType: "none", bgColor: "#1a5c30", events: []
-  });
-  const [bannerFile, setBannerFile] = useState(null);
+  // Banners (multi)
+  const [banners, setBanners] = useState([]);
   const [bannerLoading, setBannerLoading] = useState(false);
-  const [newEvent, setNewEvent] = useState({ label: "", emoji: "🔥" });
+  const [showBannerForm, setShowBannerForm] = useState(false);
+  const [editBanner, setEditBanner] = useState(null);
+  const [bannerMediaFile, setBannerMediaFile] = useState(null);
+  const [newBannerEvent, setNewBannerEvent] = useState({ label: "", emoji: "🔥" });
+  const defaultBannerForm = { title:"", subtitle:"", description:"", bgColor:"#1a5c30", mediaType:"none", mediaUrl:"", buttonText:"", buttonLink:"", startDate:"", endDate:"", order:0, isActive:true, events:[] };
+  const [bannerForm, setBannerForm] = useState(defaultBannerForm);
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -131,11 +131,55 @@ export default function Admin() {
     try { const res = await fetch(`${API}/auth/admins`, { headers: authHeaders }); if (res.ok) setAdmins(await res.json()); } catch {}
   };
 
-  const fetchBanner = async () => {
-    try { const res = await fetch(`${API}/api/banner`); if (res.ok) setBanner(await res.json()); } catch {}
+  const fetchBanners = async () => {
+    try {
+      const res = await fetch(`${API}/api/banners/all`, { headers: authHeaders });
+      if (res.ok) setBanners(await res.json());
+    } catch {}
   };
 
-  useEffect(() => { fetchFoods(); fetchAdmins(); fetchBanner(); }, []);
+  const saveBanner = async () => {
+    setBannerLoading(true);
+    try {
+      let mediaUrl = bannerForm.mediaUrl;
+      if (bannerMediaFile && bannerForm.mediaType !== "none") {
+        const fd = new FormData();
+        fd.append("image", bannerMediaFile);
+        const r = await fetch(`${API}/api/upload`, { method:"POST", headers:authHeaders, body:fd });
+        const d = await r.json();
+        if (r.ok) mediaUrl = d.url;
+      }
+      const fd = new FormData();
+      Object.entries({...bannerForm, mediaUrl, events: JSON.stringify(bannerForm.events)}).forEach(([k,v]) => {
+        if (v !== null && v !== undefined) fd.append(k, v);
+      });
+      const url = editBanner ? `${API}/api/banners/${editBanner}` : `${API}/api/banners`;
+      const method = editBanner ? "PUT" : "POST";
+      const res = await fetch(url, { method, headers: authHeaders, body: fd });
+      if (res.ok) {
+        alert(editBanner ? "✅ Yangilandi!" : "✅ Banner qo'shildi!");
+        setShowBannerForm(false); setEditBanner(null); setBannerForm(defaultBannerForm);
+        setBannerMediaFile(null); fetchBanners();
+      } else {
+        const d = await res.json(); alert("Xato: " + d.message);
+      }
+    } catch(e) { alert("Server xatosi: " + e.message); }
+    finally { setBannerLoading(false); }
+  };
+
+  const deleteBanner = async (id) => {
+    if (!window.confirm("Bannerni o'chirishni tasdiqlaysizmi?")) return;
+    const res = await fetch(`${API}/api/banners/${id}`, { method:"DELETE", headers: authHeaders });
+    if (res.ok) fetchBanners();
+  };
+
+  const addBannerEvent = () => {
+    if (!newBannerEvent.label.trim()) return;
+    setBannerForm(f => ({ ...f, events: [...f.events, { id: Date.now().toString(), ...newBannerEvent }] }));
+    setNewBannerEvent({ label: "", emoji: "🔥" });
+  };
+
+  useEffect(() => { fetchFoods(); fetchAdmins(); fetchBanners(); }, []);
   useEffect(() => { if (tab === "orders") fetchOrders(); }, [tab, orderFilter]);
 
   const resetForm = () => {
@@ -285,33 +329,6 @@ export default function Admin() {
     if (res.ok) fetchAdmins();
   };
 
-  const handleBannerSave = async () => {
-    setBannerLoading(true);
-    try {
-      let mediaUrl = banner.mediaUrl;
-      if (bannerFile && banner.mediaType !== "none") {
-        const compressed = await compressImage(bannerFile);
-        mediaUrl = await uploadToServer(compressed, token);
-      }
-      const fd = new FormData();
-      fd.append("title", banner.title);
-      fd.append("subtitle", banner.subtitle);
-      fd.append("description", banner.description);
-      fd.append("bgColor", banner.bgColor);
-      fd.append("mediaType", banner.mediaType);
-      fd.append("events", JSON.stringify(banner.events));
-      if (mediaUrl && banner.mediaType !== "none") fd.append("imageUrl", mediaUrl);
-      const res = await fetch(`${API}/api/banner`, { method: "PUT", headers: authHeaders, body: fd });
-      if (res.ok) { setBanner(await res.json()); setBannerFile(null); alert("✅ Banner saqlandi!"); }
-    } catch (e) { alert("Xato: " + e.message); }
-    finally { setBannerLoading(false); }
-  };
-
-  const addEvent = () => {
-    if (!newEvent.label.trim()) return;
-    setBanner(b => ({ ...b, events: [...b.events, { id: Date.now(), ...newEvent }] }));
-    setNewEvent({ label: "", emoji: "🔥" });
-  };
 
   const handleLogout = () => { localStorage.clear(); window.location.href = "/login"; };
 
@@ -594,85 +611,187 @@ export default function Admin() {
 
         {/* ══ BANNER ══ */}
         {tab === "banner" && (
-          <div className="admin-section">
-            <h2 className="section-title">🎨 Bosh sahifa banneri</h2>
-            <div className="banner-preview" style={{ background: banner.bgColor }}>
-              {banner.mediaType === "image" && banner.mediaUrl && (
-                <img src={banner.mediaUrl} alt="banner" className="banner-preview-media" />
-              )}
-              {banner.mediaType === "video" && banner.mediaUrl && (
-                <video src={banner.mediaUrl} autoPlay muted loop playsInline className="banner-preview-media" />
-              )}
-              <div className="banner-preview-overlay" />
-              <div className="banner-preview-content">
-                <div className="banner-preview-title">{banner.title}</div>
-                <div className="banner-preview-subtitle">{banner.subtitle}</div>
-                <div className="banner-preview-desc">{banner.description}</div>
+          <div>
+            {/* Banner ro'yxati */}
+            <div className="admin-section">
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <h2 className="section-title" style={{marginBottom:0}}>🎨 Bannerlar ({banners.length})</h2>
+                {savedUser.role === "superadmin" && (
+                  <button className="btn-primary" onClick={() => { setEditBanner(null); setBannerForm(defaultBannerForm); setShowBannerForm(true); }}>
+                    + Yangi banner
+                  </button>
+                )}
               </div>
+
+              {banners.length === 0 ? (
+                <div style={{textAlign:"center",padding:"40px 20px",color:"var(--gray)"}}>
+                  <p>Hali banner yo'q</p>
+                </div>
+              ) : (
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  {banners.map(b => (
+                    <div key={b._id} style={{border:`2px solid ${b.isActive ? "var(--g3)" : "#fee2e2"}`,borderRadius:16,overflow:"hidden",background:"white"}}>
+                      {/* Preview */}
+                      <div style={{background:b.bgColor,padding:"16px 18px",position:"relative",overflow:"hidden",minHeight:80,display:"flex",alignItems:"center",gap:12}}>
+                        {b.mediaType==="image" && b.mediaUrl && (
+                          <img src={b.mediaUrl} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:0.3}} />
+                        )}
+                        <div style={{position:"relative",zIndex:1,flex:1}}>
+                          <div style={{fontWeight:900,color:"white",fontSize:"1rem"}}>{b.title}</div>
+                          <div style={{color:"#a3d45b",fontWeight:700,fontSize:"0.88rem"}}>{b.subtitle}</div>
+                          {b.description && <div style={{color:"rgba(255,255,255,0.8)",fontSize:"0.78rem",marginTop:2}}>{b.description}</div>}
+                          {b.events?.length > 0 && (
+                            <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+                              {b.events.map(ev => <span key={ev.id} style={{background:"rgba(255,255,255,0.15)",color:"white",padding:"2px 10px",borderRadius:20,fontSize:"0.75rem"}}>{ev.emoji} {ev.label}</span>)}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end"}}>
+                          {b.startDate && <span style={{background:"rgba(0,0,0,0.3)",color:"white",padding:"2px 8px",borderRadius:10,fontSize:"0.7rem"}}>🕐 {new Date(b.startDate).toLocaleDateString()}</span>}
+                          {b.endDate && <span style={{background:"rgba(0,0,0,0.3)",color:"white",padding:"2px 8px",borderRadius:10,fontSize:"0.7rem"}}>⏰ {new Date(b.endDate).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                      {/* Actions */}
+                      <div style={{padding:"10px 14px",display:"flex",gap:8,alignItems:"center"}}>
+                        <span style={{fontSize:"0.78rem",color:b.isActive?"var(--g)":"#ef4444",fontWeight:700,flex:1}}>
+                          {b.isActive ? "✅ Faol" : "❌ Nofaol"}
+                          {b.endDate && new Date(b.endDate) < new Date() ? " (muddati o'tgan)" : ""}
+                        </span>
+                        <span style={{fontSize:"0.75rem",color:"var(--gray)"}}>Tartib: {b.order}</span>
+                        {savedUser.role === "superadmin" && (
+                          <>
+                            <button className="btn-edit" onClick={() => {
+                              setEditBanner(b._id);
+                              setBannerForm({
+                                title: b.title, subtitle: b.subtitle, description: b.description || "",
+                                bgColor: b.bgColor, mediaType: b.mediaType, mediaUrl: b.mediaUrl || "",
+                                buttonText: b.buttonText || "", buttonLink: b.buttonLink || "",
+                                startDate: b.startDate ? new Date(b.startDate).toISOString().split("T")[0] : "",
+                                endDate: b.endDate ? new Date(b.endDate).toISOString().split("T")[0] : "",
+                                order: b.order || 0, isActive: b.isActive, events: b.events || [],
+                              });
+                              setShowBannerForm(true);
+                            }}>✏️ Tahrirlash</button>
+                            <button className="btn-delete" onClick={() => deleteBanner(b._id)}>🗑</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="food-form" style={{ marginTop: 20 }}>
-              <div className="form-grid">
-                <div className="input-group"><label>Sarlavha</label><input type="text" value={banner.title} onChange={e => setBanner(b => ({ ...b, title: e.target.value }))} /></div>
-                <div className="input-group"><label>Kichik sarlavha</label><input type="text" value={banner.subtitle} onChange={e => setBanner(b => ({ ...b, subtitle: e.target.value }))} /></div>
-                <div className="input-group"><label>Tavsif</label><input type="text" value={banner.description} onChange={e => setBanner(b => ({ ...b, description: e.target.value }))} /></div>
-                <div className="input-group">
-                  <label>Fon rangi</label>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <input type="color" value={banner.bgColor} onChange={e => setBanner(b => ({ ...b, bgColor: e.target.value }))}
-                      style={{ width: 50, height: 38, border: "none", borderRadius: 8, cursor: "pointer" }} />
-                    <input type="text" value={banner.bgColor} onChange={e => setBanner(b => ({ ...b, bgColor: e.target.value }))} style={{ flex: 1 }} />
+
+            {/* Banner forma (superadmin) */}
+            {showBannerForm && savedUser.role === "superadmin" && (
+              <div className="admin-section">
+                <h2 className="section-title">{editBanner ? "✏️ Bannerni tahrirlash" : "➕ Yangi banner"}</h2>
+                <div className="food-form">
+                  <div className="form-grid">
+                    <div className="input-group"><label>Sarlavha *</label><input type="text" value={bannerForm.title} onChange={e => setBannerForm(f=>({...f,title:e.target.value}))} /></div>
+                    <div className="input-group"><label>Kichik sarlavha</label><input type="text" value={bannerForm.subtitle} onChange={e => setBannerForm(f=>({...f,subtitle:e.target.value}))} /></div>
+                    <div className="input-group"><label>Tavsif</label><input type="text" value={bannerForm.description} onChange={e => setBannerForm(f=>({...f,description:e.target.value}))} /></div>
+                    <div className="input-group">
+                      <label>Fon rangi</label>
+                      <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                        <input type="color" value={bannerForm.bgColor} onChange={e => setBannerForm(f=>({...f,bgColor:e.target.value}))} style={{width:50,height:38,border:"none",borderRadius:8,cursor:"pointer"}} />
+                        <input type="text" value={bannerForm.bgColor} onChange={e => setBannerForm(f=>({...f,bgColor:e.target.value}))} style={{flex:1}} />
+                      </div>
+                    </div>
+                    <div className="input-group"><label>Tugma matni</label><input type="text" placeholder="Batafsil..." value={bannerForm.buttonText} onChange={e => setBannerForm(f=>({...f,buttonText:e.target.value}))} /></div>
+                    <div className="input-group">
+                      <label>Tartib raqami</label>
+                      <input type="number" min="0" value={bannerForm.order} onChange={e => setBannerForm(f=>({...f,order:parseInt(e.target.value)||0}))} />
+                    </div>
+                  </div>
+
+                  {/* Muddatli aksiya */}
+                  <div style={{background:"var(--g3)",borderRadius:14,padding:16}}>
+                    <p style={{fontWeight:700,fontSize:"0.88rem",marginBottom:12}}>⏰ Muddatli aksiya (ixtiyoriy)</p>
+                    <div className="form-grid">
+                      <div className="input-group">
+                        <label>Boshlanish sanasi</label>
+                        <input type="date" value={bannerForm.startDate} onChange={e => setBannerForm(f=>({...f,startDate:e.target.value}))} />
+                      </div>
+                      <div className="input-group">
+                        <label>Tugash sanasi</label>
+                        <input type="date" value={bannerForm.endDate} onChange={e => setBannerForm(f=>({...f,endDate:e.target.value}))} />
+                      </div>
+                    </div>
+                    <p style={{fontSize:"0.75rem",color:"var(--gray)",marginTop:8}}>⚠️ Tugash sanasi o'tsa — banner avtomatik yashirinadi</p>
+                  </div>
+
+                  {/* Faollik */}
+                  <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"white",borderRadius:12,border:"2px solid var(--border)"}}>
+                    <input type="checkbox" id="isActive" checked={bannerForm.isActive}
+                      onChange={e => setBannerForm(f=>({...f,isActive:e.target.checked}))}
+                      style={{width:18,height:18,cursor:"pointer"}} />
+                    <label htmlFor="isActive" style={{fontWeight:700,cursor:"pointer"}}>Banner faol</label>
+                  </div>
+
+                  {/* Media */}
+                  <div className="input-group">
+                    <label>Media turi</label>
+                    <div style={{display:"flex",gap:10}}>
+                      {["none","image","video"].map(type => (
+                        <button key={type} type="button" className={`cat-chip ${bannerForm.mediaType===type?"selected":""}`}
+                          onClick={() => setBannerForm(f=>({...f,mediaType:type}))}>
+                          {type==="none"?"🚫 Yo'q":type==="image"?"🖼 Rasm":"🎬 Video"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {bannerForm.mediaType !== "none" && (
+                    <div className="input-group">
+                      <label>Rasm / Video</label>
+                      <input type="file" accept={bannerForm.mediaType==="image"?"image/*":"video/*"}
+                        onChange={e => setBannerMediaFile(e.target.files[0])} />
+                      {bannerForm.mediaUrl && (
+                        <div style={{marginTop:8}}>
+                          {bannerForm.mediaType==="image" ? (
+                            <img src={bannerForm.mediaUrl} alt="banner" style={{width:"100%",maxHeight:120,objectFit:"cover",borderRadius:10}} />
+                          ) : (
+                            <video src={bannerForm.mediaUrl} style={{width:"100%",maxHeight:120,borderRadius:10}} controls />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Events */}
+                  <div>
+                    <label style={{fontSize:"0.82rem",fontWeight:700,color:"var(--gray)",display:"block",marginBottom:8}}>🎪 Chip/Event labellar</label>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                      {bannerForm.events.map(ev => (
+                        <span key={ev.id} style={{display:"flex",alignItems:"center",gap:6,background:"var(--g3)",padding:"5px 12px",borderRadius:20,fontSize:"0.85rem"}}>
+                          {ev.emoji} {ev.label}
+                          <button onClick={() => setBannerForm(f=>({...f,events:f.events.filter(e=>e.id!==ev.id)}))}
+                            style={{background:"none",border:"none",cursor:"pointer",color:"#e53e3e",fontSize:14}}>✕</button>
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <input type="text" placeholder="🔥" value={newBannerEvent.emoji}
+                        onChange={e => setNewBannerEvent(n=>({...n,emoji:e.target.value}))} style={{width:70}} />
+                      <input type="text" placeholder="Chegirma 30%..." value={newBannerEvent.label}
+                        onChange={e => setNewBannerEvent(n=>({...n,label:e.target.value}))}
+                        onKeyDown={e => e.key==="Enter" && (e.preventDefault(), addBannerEvent())} style={{flex:1}} />
+                      <button type="button" className="btn-primary" onClick={addBannerEvent}>+ Qo'shish</button>
+                    </div>
+                  </div>
+
+                  <div className="form-actions">
+                    <button type="button" className="btn-primary" onClick={saveBanner} disabled={bannerLoading}>
+                      {bannerLoading ? "Saqlanmoqda..." : editBanner ? "💾 Saqlash" : "➕ Qo'shish"}
+                    </button>
+                    <button type="button" className="btn-secondary" onClick={() => { setShowBannerForm(false); setEditBanner(null); }}>
+                      Bekor qilish
+                    </button>
                   </div>
                 </div>
               </div>
-              <div className="input-group" style={{ marginTop: 16 }}>
-                <label>Media turi</label>
-                <div style={{ display: "flex", gap: 10 }}>
-                  {["none", "image", "video"].map(type => (
-                    <button key={type} type="button"
-                      className={`cat-chip ${banner.mediaType === type ? "selected" : ""}`}
-                      onClick={() => setBanner(b => ({ ...b, mediaType: type }))}>
-                      {type === "none" ? "🚫 Yo'q" : type === "image" ? "🖼 Rasm" : "🎬 Video"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {banner.mediaType !== "none" && (
-                <div className="input-group" style={{ marginTop: 12 }}>
-                  <label>Fayl yoki URL</label>
-                  <input type="file" accept={banner.mediaType === "image" ? "image/*" : "video/*"}
-                    onChange={e => setBannerFile(e.target.files[0])} />
-                  <input type="text" placeholder="Yoki URL..." value={banner.mediaUrl}
-                    onChange={e => setBanner(b => ({ ...b, mediaUrl: e.target.value }))} style={{ marginTop: 8 }} />
-                </div>
-              )}
-              <div style={{ marginTop: 20 }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#6b7c6b", display: "block", marginBottom: 10 }}>
-                  🎪 Eventlar / Aksiyalar
-                </label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                  {banner.events?.map(ev => (
-                    <span key={ev.id} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--g3)", padding: "5px 12px", borderRadius: 20, fontSize: "0.85rem", color: "var(--g4)" }}>
-                      {ev.emoji} {ev.label}
-                      <button onClick={() => setBanner(b => ({ ...b, events: b.events.filter(e => e.id !== ev.id) }))}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#e53e3e", fontSize: 14 }}>✕</button>
-                    </span>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input type="text" placeholder="🔥" value={newEvent.emoji}
-                    onChange={e => setNewEvent(n => ({ ...n, emoji: e.target.value }))} style={{ width: 70 }} />
-                  <input type="text" placeholder="Chegirma 20%..." value={newEvent.label}
-                    onChange={e => setNewEvent(n => ({ ...n, label: e.target.value }))}
-                    onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addEvent())} style={{ flex: 1 }} />
-                  <button type="button" className="btn-primary" onClick={addEvent}>+ Qo'shish</button>
-                </div>
-              </div>
-              <div className="form-actions" style={{ marginTop: 20 }}>
-                <button type="button" className="btn-primary" onClick={handleBannerSave} disabled={bannerLoading}>
-                  {bannerLoading ? "Saqlanmoqda..." : "💾 Bannerni saqlash"}
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         )}
 

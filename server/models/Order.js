@@ -16,6 +16,13 @@ const OrderSchema = new mongoose.Schema({
   tableNumber: { type: String, default: "" },
   paymentType: { type: String, enum: ["cash", "card"], default: "cash" },
   status:      { type: String, enum: ["new","preparing","delivered","cancelled"], default: "new" },
+  
+  // Millenium Taxi integration
+  milleniumOrderId: { type: String, default: null },
+  driverName:       { type: String, default: "" },
+  driverPhone:      { type: String, default: "" },
+  carModel:         { type: String, default: "" },
+  driverLocation:   { lat: Number, lng: Number },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Order", OrderSchema);

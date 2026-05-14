@@ -198,6 +198,36 @@ app.post("/api/orders", async (req, res) => {
     if (!customerName || !customerPhone || !items?.length)
       return res.status(400).json({ message: "Ism, telefon va taomlar shart!" });
     const order = await new Order({ customerName, customerPhone, items, totalPrice, address, location, orderType: orderType || "delivery", tableNumber: tableNumber || "", paymentType: paymentType || "cash", status: "new" }).save();
+
+    // Millenium Taxi ga yuborish (faqat delivery bo'lsa)
+    if ((orderType === "delivery" || !orderType) && location && process.env.MILLENIUM_API_URL && process.env.MILLENIUM_TOKEN) {
+      try {
+        const milRes = await fetch(`${process.env.MILLENIUM_API_URL}`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": process.env.MILLENIUM_TOKEN
+          },
+          body: JSON.stringify({
+            client_name: customerName,
+            client_phone: customerPhone,
+            address: address || "",
+            total_sum: totalPrice,
+            coords: location ? { lat: location.lat, lon: location.lng } : undefined,
+            order_id: order._id.toString(),
+          })
+        });
+        const milData = await milRes.json();
+        if (milData && (milData.order_id || milData.id)) {
+          order.milleniumOrderId = String(milData.order_id || milData.id);
+          await order.save();
+          console.log("✅ Millenium order yaratildi:", order.milleniumOrderId);
+        }
+      } catch(milErr) {
+        console.error("⚠️ Millenium API xato:", milErr.message);
+        // Xato bo'lsa ham davom etamiz
+      }
+    }
     const itemsList = items.map(i => `  • ${i.title} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString()} so'm`).join("\n");
     const locText = location ? `\n🗺 <a href="https://yandex.com/maps/?pt=${location.lng},${location.lat}&z=16&l=map">Xaritada ko'rish</a>` : "";
     await sendTelegram(`🛎 <b>YANGI BUYURTMA!</b>\n\n👤 <b>${customerName}</b>\n📞 ${customerPhone}\n${address ? `📍 ${address}\n` : ""}${locText}\n\n🍽 <b>Taomlar:</b>\n${itemsList}\n\n💰 <b>Jami: ${totalPrice?.toLocaleString()} so'm</b>`);
@@ -363,6 +393,103 @@ app.put("/api/banner", auth, upload.single("media"), async (req, res) => {
     await banner.save();
     res.json(banner);
   } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+});
+
+// ════ MILLENIUM WEBHOOK ═══════════════════════════════════════════════════════
+
+// GET - test uchun (browser da ochilganda)
+app.get("/webhook/millenium", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    message: "Millenium webhook ishlayapti ✅",
+    method: "Bu endpoint POST so'rovlarni qabul qiladi"
+  });
+});
+
+// POST - Millenium dan kelgan status yangilanishi
+app.post("/webhook/millenium", async (req, res) => {
+  try {
+    console.log("📦 Millenium webhook:", JSON.stringify(req.body, null, 2));
+    
+    const { 
+      order_id,       // Millenium order ID
+      state_id,       // Status raqami
+      state_kind,     // Status nomi: accepted, on_place, in_car, aborted, finished
+      driver_name,    // Haydovchi ismi
+      driver_phone,   // Haydovchi telefoni
+      car_model,      // Mashina modeli
+      car_color,      // Mashina rangi
+      car_gosnomer,   // Davlat raqami
+      crew_coords,    // { lat, lon } - haydovchi koordinatalari
+      total_sum,      // To'lov summasi
+      client_name,    // Mijoz ismi
+    } = req.body;
+
+    // State_kind ni bizning statusga o'girish
+    const statusMap = {
+      "accepted":  "preparing",   // Haydovchi qabul qildi
+      "on_place":  "preparing",   // Haydovchi manzilda
+      "in_car":    "preparing",   // Mijoz mashinada
+      "finished":  "delivered",   // Yetkazildi
+      "aborted":   "cancelled",   // Bekor qilindi
+    };
+
+    const newStatus = statusMap[state_kind];
+
+    // Millenium order_id bilan bizning orderni topish
+    let order = null;
+    if (order_id) {
+      order = await Order.findOne({ milleniumOrderId: String(order_id) });
+    }
+
+    if (order && newStatus) {
+      // Statusni yangilash
+      order.status = newStatus;
+      
+      // Haydovchi ma'lumotlarini saqlash
+      if (driver_name) order.driverName = driver_name;
+      if (driver_phone) order.driverPhone = driver_phone;
+      if (car_model) order.carModel = `${car_model} ${car_color || ""} ${car_gosnomer || ""}`.trim();
+      if (crew_coords) order.driverLocation = { lat: crew_coords.lat, lng: crew_coords.lon };
+      
+      await order.save();
+      console.log(`✅ Order ${order._id} status: ${newStatus}`);
+
+      // Telegram ga xabar yuborish
+      const stateLabels = {
+        "accepted": "🚗 Haydovchi qabul qildi",
+        "on_place": "📍 Haydovchi manzilda",
+        "in_car":   "🚙 Yetkazilmoqda",
+        "finished": "✅ Yetkazib berildi",
+        "aborted":  "❌ Bekor qilindi",
+      };
+      if (stateLabels[state_kind]) {
+        await sendTelegram(
+          `${stateLabels[state_kind]}
+
+` +
+          `👤 ${order.customerName}
+` +
+          `📞 ${order.customerPhone}
+` +
+          (driver_name ? `🚗 Haydovchi: ${driver_name} (${driver_phone})
+` : "") +
+          (car_model ? `🚙 Mashina: ${car_model} ${car_color || ""}
+` : "") +
+          `💰 Jami: ${order.totalPrice?.toLocaleString()} so'm`
+        );
+      }
+    } else {
+      console.log(`⚠️ Order topilmadi: millenium_id=${order_id}, state=${state_kind}`);
+    }
+
+    // Milleniumga OK javob qaytarish (shart!)
+    res.json({ success: true, received: true });
+
+  } catch(e) {
+    console.error("Webhook xato:", e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // ─── SERVER ───────────────────────────────────────────────────────────────────

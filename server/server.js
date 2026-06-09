@@ -120,7 +120,7 @@ const makePaymePaymentUrl = (order) => {
 
   const params = [
     `m=${merchantId}`,
-    `ac.order_id=${order._id}`,
+    `ac.order_num=${order._id}`,
     `a=${amountTiyin}`,
     `l=uz`,
     `c=${encodeURIComponent(`${returnUrl}/orders`)}`,
@@ -550,13 +550,15 @@ app.post("/api/payments/payme", async (req, res) => {
     }
 
     const account = params.account || {};
-    const orderId = account.order_id;
+    // const orderId = account.order_id
+    const orderId = params.account?.order_id || params.account?.order_num;
 
     if (method === "CheckPerformTransaction") {
       const order = await Order.findById(orderId);
 
       if (!order) {
-        return res.json(paymeError(id, -31050, "Заказ не найден", "order_id"));
+        // return res.json(paymeError(id, -31050, "Заказ не найден", "order_id"));
+        return res.json(paymeError(id, -31050, "Заказ не найден", "order_num"));
       }
 
       if (toTiyin(order.totalPrice) !== Number(params.amount)) {

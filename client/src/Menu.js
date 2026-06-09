@@ -44,6 +44,7 @@ const sortCategories = (cats) => [...cats].sort((a, b) => {
 const getCart = () => { try { return JSON.parse(localStorage.getItem("cart") || "[]"); } catch { return []; } };
 const saveCart = (c) => { localStorage.setItem("cart", JSON.stringify(c)); window.dispatchEvent(new Event("cartUpdated")); };
 const getProfile = () => { try { return JSON.parse(localStorage.getItem("profile") || "null"); } catch { return null; } };
+const foodIsAvailable = (food) => food?.isAvailable !== false;
 
 export default function Menu() {
   const [foods, setFoods] = useState([]);
@@ -117,7 +118,13 @@ export default function Menu() {
     ? foods.filter(f => getField(f.title, lang).toLowerCase().includes(search.toLowerCase()) || getField(f.title, "uz").toLowerCase().includes(search.toLowerCase()))
     : null;
   const scrollToCategory = (key) => { setActiveCategory(key); catRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" }); };
-  const addToCart = (food, e) => { e.stopPropagation(); const nc = [...cart, { ...food, qty: 1 }]; setCart(nc); saveCart(nc); };
+  const addToCart = (food, e) => {
+    e.stopPropagation();
+    if (!foodIsAvailable(food)) { alert("Bu taom hozircha mavjud emas"); return; }
+    const nc = [...cart, { ...food, qty: 1 }];
+    setCart(nc);
+    saveCart(nc);
+  };
   const changeQty = (id, delta, e) => { e.stopPropagation(); const nc = cart.map(i => i._id === id ? { ...i, qty: i.qty + delta } : i).filter(i => i.qty > 0); setCart(nc); saveCart(nc); };
   const changeLang = (l) => { setLang(l); setLangStore(l); };
   const initials = profile?.name ? profile.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) : null;
@@ -454,20 +461,24 @@ function FoodCard({ food, index, cart, lang, onOpen, onAdd, onChangeQty, t }) {
   const inCart = cart.find(i => i._id === food._id);
   const title = getField(food.title, lang);
   const desc = getField(food.description, lang);
+  const available = foodIsAvailable(food);
   return (
-    <div className="g-card" style={{ animationDelay:`${index * 0.05}s` }} onClick={onOpen}>
+    <div className={`g-card ${!available ? "g-card-unavailable" : ""}`} style={{ animationDelay:`${index * 0.05}s` }} onClick={onOpen}>
       <div className="g-card-img-wrap">
         {!imgErr && food.image ? (
           <img src={food.image} alt={title} className="g-card-img" onError={() => setImgErr(true)} />
         ) : <div className="g-card-img-placeholder">🍽</div>}
-        {inCart && <span className="g-card-in-cart">✓ {inCart.qty}</span>}
+        {!available && <span className="g-card-unavailable-badge">Hozircha yo‘q</span>}
+        {inCart && available && <span className="g-card-in-cart">✓ {inCart.qty}</span>}
       </div>
       <div className="g-card-body">
         <h3 className="g-card-title">{title}</h3>
         <p className="g-card-desc">{desc}</p>
         <div className="g-card-footer">
           <span className="g-card-price">{food.price.toLocaleString()} so'm</span>
-          {inCart ? (
+          {!available ? (
+            <button className="g-card-add-btn disabled" disabled>×</button>
+          ) : inCart ? (
             <div className="g-card-qty" onClick={e => e.stopPropagation()}>
               <button className="g-card-qty-btn minus" onClick={e => onChangeQty(food._id, -1, e)}>−</button>
               <span className="g-card-qty-num">{inCart.qty}</span>

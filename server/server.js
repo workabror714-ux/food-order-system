@@ -174,12 +174,14 @@ const FILIALS = {
   rustaveli: {
     name: "Yalpiz — Shota Rustaveli, 115",
     address: "Shota Rustaveli ko'chasi, 115, Toshkent",
-    lat: 41.2995,
-    lng: 69.2401,
+    // Yandex link: ll=69.228442,41.261532
+    lat: 41.261532,
+    lng: 69.228442,
   },
   mvd: {
     name: "Yalpiz MVD — Mirobod, 1/1",
     address: "Mirobod ko'chasi, 1/1, Toshkent",
+    // Google linkdan aniq koordinata ko'rinmagani uchun hozirgi koordinata qoldirildi.
     lat: 41.3015,
     lng: 69.2850,
   },
@@ -289,7 +291,7 @@ app.get("/api/foods/:id", async (req, res) => {
 
 app.post("/api/foods", auth, async (req, res) => {
   try {
-    const { title_uz, title_ru, title_en, price, category_uz, category_ru, category_en, desc_uz, desc_ru, desc_en, imageUrl } = req.body;
+    const { title_uz, title_ru, title_en, price, category_uz, category_ru, category_en, desc_uz, desc_ru, desc_en, imageUrl, isAvailable = true } = req.body;
     if (!imageUrl) return res.status(400).json({ message: "Rasm shart! Avval yuklang." });
     if (!title_uz) return res.status(400).json({ message: "O'zbek tili nomi shart!" });
 
@@ -299,6 +301,7 @@ app.post("/api/foods", auth, async (req, res) => {
       category: { uz: category_uz, ru: category_ru || category_uz, en: category_en || category_uz },
       description: { uz: desc_uz || "", ru: desc_ru || "", en: desc_en || "" },
       image: imageUrl,
+      isAvailable: isAvailable !== false && isAvailable !== "false",
     }).save();
     res.status(201).json(food);
   } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
@@ -306,17 +309,31 @@ app.post("/api/foods", auth, async (req, res) => {
 
 app.put("/api/foods/:id", auth, async (req, res) => {
   try {
-    const { title_uz, title_ru, title_en, price, category_uz, category_ru, category_en, desc_uz, desc_ru, desc_en, imageUrl } = req.body;
+    const { title_uz, title_ru, title_en, price, category_uz, category_ru, category_en, desc_uz, desc_ru, desc_en, imageUrl, isAvailable } = req.body;
     const update = {
       price: parseFloat(String(price).replace(/[^0-9.]/g,'')) || 0,
       title: { uz: title_uz, ru: title_ru || title_uz, en: title_en || title_uz },
       category: { uz: category_uz, ru: category_ru || category_uz, en: category_en || category_uz },
       description: { uz: desc_uz || "", ru: desc_ru || "", en: desc_en || "" },
     };
+    if (isAvailable !== undefined) update.isAvailable = isAvailable !== false && isAvailable !== "false";
     if (imageUrl) update.image = imageUrl;
     const updated = await Food.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!updated) return res.status(404).json({ message: "Topilmadi" });
     res.json(updated);
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+});
+
+app.patch("/api/foods/:id/availability", auth, async (req, res) => {
+  try {
+    const { isAvailable } = req.body;
+    const food = await Food.findByIdAndUpdate(
+      req.params.id,
+      { isAvailable: isAvailable !== false && isAvailable !== "false" },
+      { new: true }
+    );
+    if (!food) return res.status(404).json({ message: "Topilmadi" });
+    res.json(food);
   } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
 });
 
@@ -333,7 +350,28 @@ app.post("/api/orders", async (req, res) => {
     const { customerName, customerPhone, items, totalPrice, address, location, orderType, tableNumber, paymentType, filialId, filialName } = req.body;
     if (!customerName || !customerPhone || !items?.length)
       return res.status(400).json({ message: "Ism, telefon va taomlar shart!" });
-    const normalizedPaymentType = paymentType || "cash";
+    const normalizedPaymentType = paymentType || "click";
+    if (!["click", "payme"].includes(normalizedPaymentType)) {
+      return res.status(400).json({ message: "Faqat Click yoki Payme orqali to'lov qabul qilinadi." });
+    }
+
+    const foodIds = [...new Set(items.map(i => String(i.foodId || "")).filter(Boolean))];
+    const validFoodIds = foodIds.filter(id => /^[a-f0-9]{24}$/i.test(id));
+    if (validFoodIds.length !== foodIds.length) {
+      return res.status(400).json({ message: "Taom ID noto'g'ri. Savatni yangilang." });
+    }
+
+    if (validFoodIds.length) {
+      const dbFoods = await Food.find({ _id: { $in: validFoodIds } }).select("title isAvailable");
+      if (dbFoods.length !== validFoodIds.length) {
+        return res.status(400).json({ message: "Savatdagi ayrim taomlar topilmadi. Savatni yangilang." });
+      }
+      const unavailable = dbFoods.find(f => f.isAvailable === false);
+      if (unavailable) {
+        const title = unavailable.title?.uz || "Tanlangan taom";
+        return res.status(400).json({ message: `${title} hozircha mavjud emas. Iltimos, savatdan olib tashlang.` });
+      }
+    }
 
     const order = await new Order({
       customerName,
@@ -346,7 +384,7 @@ app.post("/api/orders", async (req, res) => {
       tableNumber: tableNumber || "",
       paymentType: normalizedPaymentType,
       paymentProvider: normalizedPaymentType,
-      paymentStatus: normalizedPaymentType === "cash" ? "unpaid" : "pending",
+      paymentStatus: "pending",
       filialId: filialId || null,
       filialName: filialName || null,
       status: "new"
@@ -404,11 +442,12 @@ app.post("/api/orders", async (req, res) => {
           String(now.getMinutes()).padStart(2, "0") +
           String(now.getSeconds()).padStart(2, "0");
 
+        const selectedRestaurant = FILIALS[filialId] || null;
         const restaurantAddress =
-          process.env.RESTAURANT_ADDRESS || "Yalpiz restoran, Toshkent";
+          selectedRestaurant?.address || process.env.RESTAURANT_ADDRESS || "Yalpiz restoran, Toshkent";
 
-        const restaurantLat = Number(process.env.RESTAURANT_LAT || 41.2995);
-        const restaurantLng = Number(process.env.RESTAURANT_LNG || 69.2401);
+        const restaurantLat = selectedRestaurant?.lat || Number(process.env.RESTAURANT_LAT || 41.261532);
+        const restaurantLng = selectedRestaurant?.lng || Number(process.env.RESTAURANT_LNG || 69.228442);
 
         const milleniumPhone = normalizePhoneForMillenium(customerPhone);
 

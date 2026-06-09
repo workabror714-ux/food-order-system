@@ -40,6 +40,7 @@ export default function FoodDetail() {
   const inCart = cart.find(i => i._id === id);
 
   const addToCart = () => {
+    if (food?.isAvailable === false) { alert("Bu taom hozircha mavjud emas"); return; }
     const existing = cart.find(i => i._id === id);
     let nc;
     if (existing) {
@@ -71,6 +72,7 @@ export default function FoodDetail() {
   const desc = getField(food.description, lang);
   const cat = getField(food.category, lang);
   const subtotal = food.price * qty;
+  const available = food.isAvailable !== false;
 
   return (
     <div className="fd-root">
@@ -93,12 +95,14 @@ export default function FoodDetail() {
         )}
         <div className="fd-img-overlay" />
         {cat && <span className="fd-cat-badge">{cat}</span>}
+        {!available && <span className="fd-unavailable-badge">Hozircha mavjud emas</span>}
       </div>
 
       <div className="fd-content">
         <div className="fd-card">
           <h1 className="fd-title">{title}</h1>
           <p className="fd-price">{food.price?.toLocaleString()} so'm</p>
+          {!available && <p className="fd-unavailable-note">Bu taom hozircha restoranda mavjud emas.</p>}
           {desc && (
             <>
               <div className="fd-divider" />
@@ -110,9 +114,9 @@ export default function FoodDetail() {
           <p className="fd-section-label">{t.quantity}</p>
           <div className="fd-qty-row">
             <div className="fd-qty">
-              <button className="fd-qty-btn" onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
+              <button className="fd-qty-btn" disabled={!available} onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
               <span className="fd-qty-num">{qty}</span>
-              <button className="fd-qty-btn plus" onClick={() => setQty(q => q + 1)}>+</button>
+              <button className="fd-qty-btn plus" disabled={!available} onClick={() => setQty(q => q + 1)}>+</button>
             </div>
             <div className="fd-subtotal">
               <span className="fd-subtotal-label">{t.total}</span>
@@ -123,8 +127,8 @@ export default function FoodDetail() {
       </div>
 
       <div className="fd-bottom">
-        <button className={`fd-add-btn ${added ? "added" : ""}`} onClick={addToCart}>
-          {added ? t.addedToCart : t.addToCart}
+        <button className={`fd-add-btn ${added ? "added" : ""}`} onClick={addToCart} disabled={!available}>
+          {!available ? "Hozircha mavjud emas" : added ? t.addedToCart : t.addToCart}
         </button>
         <button className="fd-menu-btn" onClick={() => navigate("/")}>{t.backToMenu}</button>
       </div>

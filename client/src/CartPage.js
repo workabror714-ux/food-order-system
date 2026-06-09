@@ -15,8 +15,7 @@ const isValid = (f) => f.replace(/\s/g,"").length===9;
 
 
 const FILIALS = [
-  // Haqiqiy koordinatalarni Google/Yandex linkdan aniqlab, shu yerda almashtiramiz
-  { id: "rustaveli", name: "Yalpiz — Shota Rustaveli, 115", address: "Shota Rustaveli ko'chasi, 115, Toshkent", lat: 41.2995, lng: 69.2401 },
+  { id: "rustaveli", name: "Yalpiz — Shota Rustaveli, 115", address: "Shota Rustaveli ko'chasi, 115, Toshkent", lat: 41.261532, lng: 69.228442 },
   { id: "mvd",       name: "Yalpiz MVD — Mirobod, 1/1",    address: "Mirobod ko'chasi, 1/1, Toshkent",    lat: 41.3015, lng: 69.2850 },
 ];
 
@@ -112,6 +111,8 @@ export default function CartPage() {
     if (!selectedFilial) { alert("Filialni tanlang!"); return; }
     if (orderType==="dine_in" && !tableNumber.trim()) { alert("Stol raqamini kiriting!"); return; }
     if (orderType==="delivery" && !form.address.trim()) { alert("Manzilni kiriting!"); return; }
+    const unavailableItem = cart.find(i => i.isAvailable === false);
+    if (unavailableItem) { alert(`${getField(unavailableItem.title, lang)} hozircha mavjud emas. Iltimos, savatdan olib tashlang.`); return; }
     setOrderLoading(true);
     try {
       const fullPhone = rawPhone(form.phoneFormatted);

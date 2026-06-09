@@ -84,6 +84,7 @@ export default function Admin() {
   const [selectedCat, setSelectedCat] = useState({ uz: "", ru: "", en: "" });
   const [catNames, setCatNames] = useState({ uz: "", ru: "", en: "" });
   const [showCatInput, setShowCatInput] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(true);
 
   // Rasm
   const [imageFile, setImageFile] = useState(null);
@@ -206,7 +207,7 @@ export default function Admin() {
     setTitles({ uz: "", ru: "", en: "" });
     setDescs({ uz: "", ru: "", en: "" });
     setSelectedCat({ uz: "", ru: "", en: "" });
-    setPrice(""); setImageFile(null); setImagePreview(null); setUploadedUrl(""); setEditId(null);
+    setPrice(""); setIsAvailable(true); setImageFile(null); setImagePreview(null); setUploadedUrl(""); setEditId(null);
   };
 
   const addCategory = () => {
@@ -278,6 +279,7 @@ export default function Admin() {
         desc_uz: descs.uz,
         desc_ru: descs.ru || descs.uz,
         desc_en: descs.en || descs.uz,
+        isAvailable,
       };
       if (uploadedUrl) body.imageUrl = uploadedUrl;
 
@@ -304,12 +306,31 @@ export default function Admin() {
     if (res.ok) { setSelectedFood(null); fetchFoods(); }
   };
 
+  const toggleFoodAvailability = async (food, e) => {
+    e?.stopPropagation?.();
+    const next = food.isAvailable === false;
+    const res = await fetch(`${API}/api/foods/${food._id}/availability`, {
+      method: "PATCH",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ isAvailable: next }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setFoods(prev => prev.map(f => f._id === updated._id ? updated : f));
+      setSelectedFood(prev => prev && prev._id === updated._id ? updated : prev);
+    } else {
+      const d = await res.json().catch(() => ({}));
+      alert(d.message || "Holatni o'zgartirishda xato");
+    }
+  };
+
   const handleEdit = (food) => {
     setTitles({ uz: getField(food.title, "uz"), ru: getField(food.title, "ru"), en: getField(food.title, "en") });
     setDescs({ uz: getField(food.description, "uz"), ru: getField(food.description, "ru"), en: getField(food.description, "en") });
     const cat = typeof food.category === "object" ? food.category : { uz: food.category, ru: food.category, en: food.category };
     setSelectedCat(cat);
     setPrice(food.price);
+    setIsAvailable(food.isAvailable !== false);
     setEditId(food._id);
     setUploadedUrl(food.image || "");
     setImagePreview(food.image || null);
@@ -429,6 +450,17 @@ export default function Admin() {
                   />
                 </div>
 
+                <div className="availability-editor">
+                  <div>
+                    <strong>{isAvailable ? "✅ Taom mavjud" : "❌ Hozircha yo‘q"}</strong>
+                    <p>O‘chirib qo‘yilsa, mijoz savatga qo‘sha olmaydi.</p>
+                  </div>
+                  <label className="availability-switch">
+                    <input type="checkbox" checked={isAvailable} onChange={e => setIsAvailable(e.target.checked)} />
+                    <span></span>
+                  </label>
+                </div>
+
                 {/* Kategoriya */}
                 <div className="input-group">
                   <label>Kategoriya *</label>
@@ -527,10 +559,15 @@ export default function Admin() {
               <h2 className="section-title">📋 Mavjud taomlar ({foods.length})</h2>
               <div className="food-admin-grid">
                 {foods.map(food => (
-                  <div key={food._id} className="food-admin-card" onClick={() => setSelectedFood(food)}>
-                    <img src={food.image || "https://placehold.co/200x120/e8f5ee/1d6b3e?text=Rasm"}
+                  <div key={food._id} className={`food-admin-card ${food.isAvailable === false ? "unavailable" : ""}`} onClick={() => setSelectedFood(food)}>
+                    <div className="food-admin-img-wrap">
+                      <img src={food.image || "https://placehold.co/200x120/e8f5ee/1d6b3e?text=Rasm"}
                       alt={getField(food.title, "uz")} className="food-admin-img"
                       onError={e => e.target.src = "https://placehold.co/200x120/e8f5ee/1d6b3e?text=Rasm"} />
+                      <span className={`availability-badge ${food.isAvailable === false ? "off" : "on"}`}>
+                        {food.isAvailable === false ? "Hozircha yo‘q" : "Mavjud"}
+                      </span>
+                    </div>
                     <div className="food-admin-info">
                       <span className="food-admin-cat">{getField(food.category, "uz")}</span>
                       <h4>{getField(food.title, "uz")}</h4>
@@ -538,6 +575,9 @@ export default function Admin() {
                       <p className="food-admin-desc">{getField(food.description, "uz")}</p>
                       <div className="food-admin-btns" onClick={e => e.stopPropagation()}>
                         <button className="btn-edit" onClick={() => handleEdit(food)}>✏️ Tahrirlash</button>
+                        <button className={food.isAvailable === false ? "btn-available" : "btn-unavailable"} onClick={(e) => toggleFoodAvailability(food, e)}>
+                          {food.isAvailable === false ? "✅ Yoqish" : "⛔ O‘chirish"}
+                        </button>
                         <button className="btn-delete" onClick={() => handleDelete(food._id)}>🗑 O'chirish</button>
                       </div>
                     </div>
@@ -913,11 +953,17 @@ export default function Admin() {
               onError={e => e.target.src = "https://placehold.co/400x200/e8f5ee/1d6b3e?text=Rasm"} />
             <div className="modal-body">
               <span className="food-admin-cat">{getField(selectedFood.category, "uz")}</span>
+              <span className={`availability-badge ${selectedFood.isAvailable === false ? "off" : "on"}`}>
+                {selectedFood.isAvailable === false ? "Hozircha yo‘q" : "Mavjud"}
+              </span>
               <h2 className="modal-title">{getField(selectedFood.title, "uz")}</h2>
               <p className="modal-price">{selectedFood.price?.toLocaleString()} so'm</p>
               <p className="modal-desc">{getField(selectedFood.description, "uz")}</p>
               <div className="modal-actions">
                 <button className="btn-edit" onClick={() => handleEdit(selectedFood)}>✏️ Tahrirlash</button>
+                <button className={selectedFood.isAvailable === false ? "btn-available" : "btn-unavailable"} onClick={(e) => toggleFoodAvailability(selectedFood, e)}>
+                  {selectedFood.isAvailable === false ? "✅ Yoqish" : "⛔ O‘chirish"}
+                </button>
                 <button className="btn-delete" onClick={() => handleDelete(selectedFood._id)}>🗑 O'chirish</button>
               </div>
             </div>

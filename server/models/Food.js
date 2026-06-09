@@ -19,6 +19,7 @@ const FoodSchema = new mongoose.Schema({
     en: { type: String, default: "" },
   },
   image: { type: String, default: "" },
+  isAvailable: { type: Boolean, default: true },
 }, { timestamps: true });
 
 // Virtual: tanlangan tilda nom

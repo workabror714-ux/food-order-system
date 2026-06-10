@@ -276,7 +276,7 @@ const extractMilleniumPrice = (data) => {
   return 0;
 };
 
-const calcMilleniumDeliveryPrice = async ({ filialId, customerPhone, location }) => {
+const calcMilleniumDeliveryPrice = async ({ filialId, location }) => {
   if (process.env.MILLENIUM_ENABLED !== "true") {
     throw new Error("Millenium integratsiyasi yoqilmagan");
   }
@@ -285,28 +285,27 @@ const calcMilleniumDeliveryPrice = async ({ filialId, customerPhone, location })
   }
 
   const restaurant = getSelectedFilial(filialId);
-  const phone = normalizeMilleniumPhone(customerPhone || process.env.MILLENIUM_TEST_PHONE || "");
-  if (!phone || phone.length < 9) {
-    throw new Error("Telefon raqam Millenium uchun noto'g'ri");
+  const clientId = Number(process.env.MILLENIUM_CLIENT_ID || 0);
+  const crewGroupId = Number(process.env.MILLENIUM_CREW_GROUP_ID || 0);
+
+  if (!clientId) {
+    throw new Error("MILLENIUM_CLIENT_ID env qo'yilmagan");
+  }
+  if (!crewGroupId) {
+    throw new Error("MILLENIUM_CREW_GROUP_ID env qo'yilmagan");
   }
 
+  // Support tavsiyasi: calc_order_cost2 uchun phone emas, client_id yuboriladi.
   const payload = {
-    phone,
-    source_time: makeSourceTime(),
-    is_prior: false,
-    source_lat: Number(restaurant.lat),
-    source_lon: Number(restaurant.lng),
-    dest_lat: Number(location.lat),
-    dest_lon: Number(location.lng),
+    crew_group_id: crewGroupId,
+    client_id: clientId,
     analyze_route: true,
+    source_time: makeSourceTime(),
+    source_lon: Number(restaurant.lng),
+    source_lat: Number(restaurant.lat),
+    dest_lon: Number(location.lng),
+    dest_lat: Number(location.lat),
   };
-
-  if (process.env.MILLENIUM_TARIFF_ID) {
-    payload.tariff_id = Number(process.env.MILLENIUM_TARIFF_ID);
-  }
-  if (process.env.MILLENIUM_CREW_GROUP_ID) {
-    payload.crew_group_id = Number(process.env.MILLENIUM_CREW_GROUP_ID);
-  }
 
   const milData = await callMillenium("/common_api/1.0/calc_order_cost2", payload);
   console.log("Millenium calc_order_cost2 response:", JSON.stringify(milData, null, 2));
@@ -317,7 +316,7 @@ const calcMilleniumDeliveryPrice = async ({ filialId, customerPhone, location })
 
   const price = extractMilleniumPrice(milData);
   if (!price) {
-    throw new Error("Millenium javobida narx topilmadi");
+    throw new Error("Millenium javobida narx topilmadi. Response fieldlarini tekshiring.");
   }
 
   return {
@@ -478,7 +477,7 @@ app.delete("/api/foods/:id", auth, async (req, res) => {
 
 app.post("/api/millenium/calc-price", async (req, res) => {
   try {
-    const { filialId, customerPhone, location } = req.body || {};
+    const { filialId, location } = req.body || {};
     if (!filialId || !FILIALS[filialId]) {
       return res.status(400).json({ success: false, message: "Filial noto'g'ri yoki tanlanmagan" });
     }
@@ -486,7 +485,7 @@ app.post("/api/millenium/calc-price", async (req, res) => {
       return res.status(400).json({ success: false, message: "Lokatsiya kerak" });
     }
 
-    const result = await calcMilleniumDeliveryPrice({ filialId, customerPhone, location });
+    const result = await calcMilleniumDeliveryPrice({ filialId, location });
 
     res.json({
       success: true,
@@ -544,7 +543,7 @@ app.post("/api/orders", async (req, res) => {
         return res.status(400).json({ message: "Yetkazish uchun lokatsiya shart." });
       }
       try {
-        deliveryCalc = await calcMilleniumDeliveryPrice({ filialId, customerPhone, location });
+        deliveryCalc = await calcMilleniumDeliveryPrice({ filialId, location });
       } catch (calcErr) {
         return res.status(400).json({
           message: `Taxi narxini Milleniumdan hisoblab bo'lmadi: ${calcErr.message}`
@@ -634,9 +633,7 @@ app.post("/api/orders", async (req, res) => {
           check_duplicate: true,
           customer: customerName,
           passenger: customerName,
-          comment: `Yalpiz delivery order #${order._id}. Taomlar: ${Number(totalPrice || 0).toLocaleString()} so'm. Taxi: ${Number(order.deliveryPrice || 0).toLocaleString()} so'm. To'lov: ${paymentType}. Taxi pulini mijoz haydovchiga alohida to'laydi.`,
-          total_cost: Number(order.deliveryPrice || 0),
-          cost_freeze: Number(order.deliveryPrice || 0) > 0,
+          comment: `Yalpiz delivery order #${order._id}. Taomlar: ${Number(totalPrice || 0).toLocaleString()} so'm. Oldindan hisoblangan taxi: ${Number(order.deliveryPrice || 0).toLocaleString()} so'm. To'lov: ${paymentType}. Taxi pulini mijoz haydovchiga alohida to'laydi.`,
           addresses: [
             {
               address: restaurantAddress,
@@ -651,9 +648,6 @@ app.post("/api/orders", async (req, res) => {
           ],
         };
 
-        if (process.env.MILLENIUM_TARIFF_ID) {
-          payload.tariff_id = Number(process.env.MILLENIUM_TARIFF_ID);
-        }
         if (process.env.MILLENIUM_CREW_GROUP_ID) {
           payload.crew_group_id = Number(process.env.MILLENIUM_CREW_GROUP_ID);
         }

@@ -100,7 +100,6 @@ export default function CartPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             filialId: selectedFilial.id,
-            customerPhone: rawPhone(form.phoneFormatted),
             location,
           }),
         });

@@ -674,8 +674,12 @@ app.post("/api/orders", async (req, res) => {
 
     const normalizedOrderType = orderType || "delivery";
     const normalizedPaymentType = paymentType || "click";
-    if (!["click", "payme"].includes(normalizedPaymentType)) {
-      return res.status(400).json({ message: "Faqat Click yoki Payme orqali to'lov qabul qilinadi." });
+    if (!["click", "payme", "cash"].includes(normalizedPaymentType)) {
+      return res.status(400).json({ message: "To'lov turi noto'g'ri." });
+    }
+    // Naqd faqat olib ketish (pickup) uchun
+    if (normalizedPaymentType === "cash" && normalizedOrderType !== "pickup") {
+      return res.status(400).json({ message: "Naqd to'lov faqat olib ketishda mumkin. Yetkazib berishda online to'lov shart." });
     }
 
     // Yopiq filialga buyurtma qabul qilinmaydi
@@ -728,7 +732,7 @@ app.post("/api/orders", async (req, res) => {
       orderType: normalizedOrderType,
       paymentType: normalizedPaymentType,
       paymentProvider: normalizedPaymentType,
-      paymentStatus: "pending",
+      paymentStatus: normalizedPaymentType === "cash" ? "unpaid" : "pending",
       filialId: filialId || null,
       filialName: filialName || null,
       deliveryPrice: deliveryCalc?.price || 0,
@@ -747,6 +751,16 @@ app.post("/api/orders", async (req, res) => {
     if (normalizedPaymentType === "click") {
       order.paymentUrl = makeClickPaymentUrl(order);
       await order.save();
+    }
+
+    // NAQD (pickup): to'lov kutilmaydi — buyurtma darrov oshxonaga tushadi
+    if (normalizedPaymentType === "cash") {
+      await sendPaidOrderTelegram(order);
+      return res.status(201).json({
+        message: "Buyurtma qabul qilindi! ✅",
+        order,
+        paymentUrl: "",
+      });
     }
 
     // Taxi chaqirish va oshxona telegrami ENDI BU YERDA EMAS —
@@ -921,18 +935,26 @@ const buildOrderTelegramText = (order) => {
   const itemsList = (order.items || []).map(i => `  • ${i.title} × ${i.quantity} = ${(Number(i.price) * Number(i.quantity)).toLocaleString()} so'm`).join("\n");
   const locText = order.location?.lat ? `\n🗺 <a href="https://yandex.com/maps/?pt=${order.location.lng},${order.location.lat}&z=16&l=map">Xaritada ko'rish</a>` : "";
   const orderTypeText = order.orderType === "pickup" ? "🛍 <b>Olib ketish</b>" : "🛵 <b>Dastavka</b>";
-  const payLabel = order.paymentProvider === "payme" ? "Payme" : "Click";
+  const isCash = order.paymentType === "cash";
+  const payLabel = isCash ? "💵 Naqd" : (order.paymentProvider === "payme" ? "Payme" : "Click");
   const taxiText = order.orderType === "delivery"
     ? `\n🚕 Taxi: ${Number(order.deliveryPrice || 0).toLocaleString()} so'm (beznal — to'lovga kiritilgan)${order.milleniumOrderId ? ` | Millenium #${order.milleniumOrderId}` : "\n⚠️ <b>Millenium chaqirilmadi — taxini QO'LDA chaqiring!</b>"}`
     : "";
   const statusLine = `\n\n📌 <b>Holat: ${STATUS_LABELS[order.status] || order.status}</b>${order.statusUpdatedBy ? ` — ${order.statusUpdatedBy}` : ""}`;
+  // Naqd va online uchun sarlavha + to'lov qatori farqli
+  const header = isCash
+    ? `🛎 <b>YANGI BUYURTMA — 💵 NAQD (olib ketganda)</b>\n${orderTypeText}\n\n`
+    : `🛎 <b>YANGI BUYURTMA — ✅ TO'LANDI (${payLabel})</b>\n${orderTypeText}\n\n`;
+  const payLine = isCash
+    ? `💵 <b>Naqd to'lov: ${Number(order.paymentAmount || order.totalPrice || 0).toLocaleString()} so'm — olib ketganda</b>\n`
+    : `💳 <b>Jami to'landi: ${Number(order.paymentAmount || order.totalPrice || 0).toLocaleString()} so'm</b>\n`;
   return (
-    `🛎 <b>YANGI BUYURTMA — ✅ TO'LANDI (${payLabel})</b>\n${orderTypeText}\n\n` +
+    header +
     `👤 <b>${order.customerName}</b>\n📞 ${order.customerPhone}\n` +
     (order.address ? `📍 ${order.address}\n` : "") +
     `${locText}\n\n🍽 <b>Taomlar:</b>\n${itemsList}\n\n` +
     `💰 Taomlar: ${Number(order.totalPrice || 0).toLocaleString()} so'm${taxiText}\n` +
-    `💳 <b>Jami to'landi: ${Number(order.paymentAmount || order.totalPrice || 0).toLocaleString()} so'm</b>\n` +
+    payLine +
     `🧾 Order: ${order._id}` +
     statusLine
   );

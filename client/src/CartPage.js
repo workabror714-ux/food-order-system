@@ -21,6 +21,7 @@ const isValid = (f) => f.replace(/\s/g,"").length===9;
 const paymentLabel = (type) => {
   if (type === "click") return "Click";
   if (type === "payme") return "Payme";
+  if (type === "cash") return "Naqd";
   return "Online";
 };
 
@@ -77,6 +78,11 @@ export default function CartPage() {
       .then(data => Array.isArray(data) ? setFilials(data) : setFilials([]))
       .catch(() => setFilials([]));
   }, []);
+
+  // Delivery'da naqd bo'lmaydi — cash tanlangan bo'lsa click'ga qaytaramiz
+  useEffect(() => {
+    if (orderType === "delivery" && paymentType === "cash") setPaymentType("click");
+  }, [orderType, paymentType]);
 
   useEffect(() => {
     const canCalculate =
@@ -376,6 +382,14 @@ export default function CartPage() {
                   <span className="payment-label">Payme</span>
                   <span className="payment-desc">Online to‘lov</span>
                 </div>
+
+                {orderType==="pickup" && (
+                  <div className={`payment-card ${paymentType==="cash"?"selected":""}`} onClick={() => setPaymentType("cash")}>
+                    <span className="payment-logo-img" style={{fontSize:"2rem",display:"flex",alignItems:"center",justifyContent:"center"}}>💵</span>
+                    <span className="payment-label">Naqd</span>
+                    <span className="payment-desc">Olib ketganda</span>
+                  </div>
+                )}
               </div>
               <div className="cp-footer" style={{marginTop:16}}>
                 <button className="cp-next-btn" onClick={() => setStep("form")}>{t.continueBtn}</button>

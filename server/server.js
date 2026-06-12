@@ -14,6 +14,7 @@ const Order = require("./models/Order");
 const AdminUser = require("./models/AdminUser");
 const Banner = require("./models/Banner");
 const Image = require("./models/Image");
+const Filial = require("./models/Filial");
 
 const crypto = require("crypto");
 
@@ -192,21 +193,53 @@ const checkClickSign = (body) => {
   return calculated === sign_string;
 };
 
-const FILIALS = {
-  rustaveli: {
-    name: "Yalpiz — Shota Rustaveli, 115",
-    address: "Shota Rustaveli ko'chasi, 115, Toshkent",
-    // Yandex link: ll=69.228442,41.261532
-    lat: 41.261532,
-    lng: 69.228442,
-  },
-  mvd: {
-    name: "Yalpiz MVD — Mirobod, 1/1",
-    address: "Mirobod ko'chasi, 1/1, Toshkent",
-    // Google linkdan aniq koordinata ko'rinmagani uchun hozirgi koordinata qoldirildi.
-    lat: 41.3015,
-    lng: 69.2850,
-  },
+// Filiallar DB'da saqlanadi. Sinxron kodlar (taxi narxi, order) uchun
+// xotirada cache saqlaymiz: { slug: {name,address,lat,lng,isActive} }
+let FILIALS = {};
+
+// Boshlang'ich filiallar (DB bo'sh bo'lsa, bir marta yoziladi)
+const DEFAULT_FILIALS = [
+  { slug: "rustaveli", name: "Yalpiz — Shota Rustaveli, 115", address: "Shota Rustaveli ko'chasi, 115, Toshkent", lat: 41.261532, lng: 69.228442, isActive: true, order: 0 },
+  { slug: "mvd",       name: "Yalpiz MVD — Mirobod, 1/1",     address: "Mirobod ko'chasi, 1/1, Toshkent",     lat: 41.3015,   lng: 69.2850,   isActive: true, order: 1 },
+];
+
+// DB'dan o'qib, FILIALS cache'ni yangilaydi (slug -> obyekt)
+const reloadFilialsCache = async () => {
+  try {
+    const list = await Filial.find({}).sort({ order: 1, createdAt: 1 });
+    const next = {};
+    for (const f of list) {
+      next[f.slug] = {
+        _id: String(f._id),
+        slug: f.slug,
+        name: f.name,
+        address: f.address || "",
+        lat: f.lat,
+        lng: f.lng,
+        isActive: f.isActive !== false,
+      };
+    }
+    FILIALS = next;
+    return list;
+  } catch (e) {
+    console.error("Filiallar cache xato:", e.message);
+    return [];
+  }
+};
+
+// Server ishga tushganda: DB bo'sh bo'lsa default filiallarni yozadi, keyin cache yuklaydi
+const seedFilials = async () => {
+  try {
+    const count = await Filial.countDocuments();
+    if (count === 0) {
+      await Filial.insertMany(DEFAULT_FILIALS);
+      console.log("✅ Boshlang'ich filiallar yozildi");
+    }
+    await reloadFilialsCache();
+    console.log(`✅ ${Object.keys(FILIALS).length} ta filial yuklandi`);
+  } catch (e) {
+    console.error("Filiallar seed xato:", e.message);
+  }
 };
 
 const makeSourceTime = () => {
@@ -228,7 +261,10 @@ const normalizeMilleniumPhone = (phone) => {
 };
 
 const getSelectedFilial = (filialId) => {
-  return FILIALS[filialId] || FILIALS.rustaveli;
+  if (filialId && FILIALS[filialId]) return FILIALS[filialId];
+  // fallback: birinchi mavjud filial
+  const first = Object.values(FILIALS)[0];
+  return first || null;
 };
 
 const getMilleniumBaseUrl = () => {
@@ -425,6 +461,104 @@ const parseField = (val, fallback = "") => {
   return { uz: val, ru: val, en: val };
 };
 
+// ════ FILIALLAR (Restoran filiallari) ═════════════════════════════════════════
+// slug generatsiyasi: nomdan, lotin harflari + raqam, takrorlanmas
+const makeFilialSlug = (name) => {
+  const base = String(name || "filial")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 30) || "filial";
+  return `${base}-${Date.now().toString(36)}`;
+};
+
+// Mijoz uchun — barcha filiallar (yopiqlar isActive:false flagi bilan)
+app.get("/api/filials", async (req, res) => {
+  try {
+    const list = await Filial.find({}).sort({ order: 1, createdAt: 1 });
+    res.json(list.map(f => ({
+      id: f.slug,
+      name: f.name,
+      address: f.address || "",
+      lat: f.lat,
+      lng: f.lng,
+      isActive: f.isActive !== false,
+    })));
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+});
+
+// Admin uchun — barcha filiallar (to'liq, _id bilan)
+app.get("/api/filials/all", auth, async (req, res) => {
+  try {
+    const list = await Filial.find({}).sort({ order: 1, createdAt: 1 });
+    res.json(list);
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+});
+
+// Yangi filial qo'shish
+app.post("/api/filials", auth, async (req, res) => {
+  try {
+    const { name, address, lat, lng, isActive, order } = req.body;
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ message: "Filial nomi shart" });
+    }
+    const filial = await new Filial({
+      slug: makeFilialSlug(name),
+      name: String(name).trim(),
+      address: address || "",
+      lat: lat === "" || lat === undefined ? null : Number(lat),
+      lng: lng === "" || lng === undefined ? null : Number(lng),
+      isActive: isActive !== false && isActive !== "false",
+      order: Number(order) || 0,
+    }).save();
+    await reloadFilialsCache();
+    res.status(201).json(filial);
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+});
+
+// Filialni tahrirlash (slug o'zgarmaydi — eski buyurtmalar saqlanadi)
+app.put("/api/filials/:id", auth, async (req, res) => {
+  try {
+    const { name, address, lat, lng, isActive, order } = req.body;
+    const update = {};
+    if (name !== undefined) update.name = String(name).trim();
+    if (address !== undefined) update.address = address;
+    if (lat !== undefined) update.lat = lat === "" ? null : Number(lat);
+    if (lng !== undefined) update.lng = lng === "" ? null : Number(lng);
+    if (isActive !== undefined) update.isActive = isActive !== false && isActive !== "false";
+    if (order !== undefined) update.order = Number(order) || 0;
+    const filial = await Filial.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!filial) return res.status(404).json({ message: "Topilmadi" });
+    await reloadFilialsCache();
+    res.json(filial);
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+});
+
+// Yoqish / o'chirish (vaqtincha yopish)
+app.patch("/api/filials/:id/toggle", auth, async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    const filial = await Filial.findByIdAndUpdate(
+      req.params.id,
+      { isActive: isActive !== false && isActive !== "false" },
+      { new: true }
+    );
+    if (!filial) return res.status(404).json({ message: "Topilmadi" });
+    await reloadFilialsCache();
+    res.json(filial);
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+});
+
+// O'chirish
+app.delete("/api/filials/:id", auth, async (req, res) => {
+  try {
+    const filial = await Filial.findByIdAndDelete(req.params.id);
+    if (!filial) return res.status(404).json({ message: "Topilmadi" });
+    await reloadFilialsCache();
+    res.json({ message: "O'chirildi" });
+  } catch (e) { res.status(500).json({ message: "Xato: " + e.message }); }
+});
+
 app.get("/api/foods", async (req, res) => {
   try {
     const filter = req.query.category ? { "category.uz": req.query.category } : {};
@@ -503,6 +637,9 @@ app.post("/api/millenium/calc-price", async (req, res) => {
     if (!filialId || !FILIALS[filialId]) {
       return res.status(400).json({ success: false, message: "Filial noto'g'ri yoki tanlanmagan" });
     }
+    if (FILIALS[filialId].isActive === false) {
+      return res.status(400).json({ success: false, message: "Bu filial vaqtincha yopiq" });
+    }
     if (!location?.lat || !location?.lng) {
       return res.status(400).json({ success: false, message: "Lokatsiya kerak" });
     }
@@ -539,6 +676,11 @@ app.post("/api/orders", async (req, res) => {
     const normalizedPaymentType = paymentType || "click";
     if (!["click", "payme"].includes(normalizedPaymentType)) {
       return res.status(400).json({ message: "Faqat Click yoki Payme orqali to'lov qabul qilinadi." });
+    }
+
+    // Yopiq filialga buyurtma qabul qilinmaydi
+    if (filialId && FILIALS[filialId] && FILIALS[filialId].isActive === false) {
+      return res.status(400).json({ message: "Tanlangan filial vaqtincha yopiq. Boshqa filialni tanlang." });
     }
 
     const foodIds = [...new Set(items.map(i => String(i.foodId || "")).filter(Boolean))];
@@ -1757,4 +1899,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
   console.log(`Server http://localhost:${PORT}`);
   await createFirstAdmin();
+  await seedFilials();
 });

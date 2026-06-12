@@ -625,8 +625,8 @@ export default function Admin() {
                             href={`https://yandex.com/maps/?pt=${order.location.lng},${order.location.lat}&z=16&l=map`}
                             target="_blank" rel="noreferrer">🗺 Xaritada ko'rish</a>
                         )}
-                        {order.orderType === "dine_in" && order.tableNumber && (
-                          <span className="order-address">🍽 Restoran — Stol №{order.tableNumber}</span>
+                        {order.orderType === "pickup" && (
+                          <span className="order-address">🛍 Olib ketish{order.filialName ? ` — ${order.filialName}` : ""}</span>
                         )}
                         {order.orderType === "delivery" && (
                           <span className={`millenium-badge ${order.milleniumOrderId ? "success" : "pending"}`}>

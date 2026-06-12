@@ -509,7 +509,7 @@ app.post("/api/millenium/calc-price", async (req, res) => {
 // ════ ORDERS ══════════════════════════════════════════════════════════════════
 app.post("/api/orders", async (req, res) => {
   try {
-    const { customerName, customerPhone, items, totalPrice, address, location, orderType, tableNumber, paymentType, filialId, filialName } = req.body;
+    const { customerName, customerPhone, items, totalPrice, address, location, orderType, paymentType, filialId, filialName } = req.body;
     if (!customerName || !customerPhone || !items?.length)
       return res.status(400).json({ message: "Ism, telefon va taomlar shart!" });
 
@@ -559,7 +559,6 @@ app.post("/api/orders", async (req, res) => {
       address,
       location,
       orderType: normalizedOrderType,
-      tableNumber: tableNumber || "",
       paymentType: normalizedPaymentType,
       paymentProvider: normalizedPaymentType,
       paymentStatus: "pending",
@@ -704,7 +703,8 @@ app.post("/api/orders", async (req, res) => {
     const itemsList = items.map(i => `  • ${i.title} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString()} so'm`).join("\n");
     const locText = location ? `\n🗺 <a href="https://yandex.com/maps/?pt=${location.lng},${location.lat}&z=16&l=map">Xaritada ko'rish</a>` : "";
     const deliveryText = order.deliveryPrice ? `\n🚕 <b>Taxi: ${order.deliveryPrice.toLocaleString()} so'm</b> (haydovchiga alohida)` : "";
-    await sendTelegram(`🛎 <b>YANGI BUYURTMA!</b>\n\n👤 <b>${customerName}</b>\n📞 ${customerPhone}\n${address ? `📍 ${address}\n` : ""}${locText}\n\n🍽 <b>Taomlar:</b>\n${itemsList}\n\n💰 <b>Taomlar jami: ${totalPrice?.toLocaleString()} so'm</b>${deliveryText}`);
+    const orderTypeText = normalizedOrderType === "pickup" ? "🛍 <b>Olib ketish</b>" : "🛵 <b>Dastavka</b>";
+    await sendTelegram(`🛎 <b>YANGI BUYURTMA!</b>\n${orderTypeText}\n\n👤 <b>${customerName}</b>\n📞 ${customerPhone}\n${address ? `📍 ${address}\n` : ""}${locText}\n\n🍽 <b>Taomlar:</b>\n${itemsList}\n\n💰 <b>Taomlar jami: ${totalPrice?.toLocaleString()} so'm</b>${deliveryText}`);
     res.status(201).json({
       message: "Buyurtma qabul qilindi! ✅",
       order,

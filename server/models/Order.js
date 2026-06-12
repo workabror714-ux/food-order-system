@@ -18,8 +18,7 @@ const OrderSchema = new mongoose.Schema({
   deliveryPriceSource: { type: String, default: "" },
   deliveryPriceCalculatedAt: { type: Date, default: null },
   deliveryPriceRaw: { type: mongoose.Schema.Types.Mixed, default: null },
-  orderType:   { type: String, enum: ["dine_in", "delivery"], default: "delivery" },
-  tableNumber: { type: String, default: "" },
+  orderType:   { type: String, enum: ["pickup", "delivery"], default: "delivery" },
   paymentType: {
     type: String,
     enum: ["cash", "card", "click", "payme"],

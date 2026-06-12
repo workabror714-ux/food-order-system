@@ -34,8 +34,7 @@ export default function CartPage() {
   const t = TRANSLATIONS[lang] || TRANSLATIONS.uz;
   const [cart, setCart] = useState(getCart);
   const [step, setStep] = useState("cart"); // cart → type → form → success
-  const [orderType, setOrderType] = useState(null); // "dine_in" | "delivery"
-  const [tableNumber, setTableNumber] = useState("");
+  const [orderType, setOrderType] = useState(null); // "pickup" | "delivery"
   const [paymentType, setPaymentType] = useState("click"); // "click" | "payme"
   const [form, setForm] = useState(() => {
     const p = getProfile();
@@ -155,7 +154,6 @@ export default function CartPage() {
     if (!isValid(form.phoneFormatted)) { alert("Telefon raqam to'liq emas! 9 ta raqam kiriting."); return; }
     if (!orderType) { alert("Buyurtma turini tanlang!"); return; }
     if (!selectedFilial) { alert("Filialni tanlang!"); return; }
-    if (orderType==="dine_in" && !tableNumber.trim()) { alert("Stol raqamini kiriting!"); return; }
     if (orderType==="delivery" && !form.address.trim()) { alert("Manzilni kiriting!"); return; }
     if (orderType==="delivery" && !location) { alert("Aniq taxi narxi uchun lokatsiyani aniqlang!"); return; }
     if (orderType==="delivery" && deliveryPriceLoading) { alert("Taxi narxi hali Milleniumdan hisoblanmoqda. Biroz kuting."); return; }
@@ -169,11 +167,11 @@ export default function CartPage() {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           customerName: form.name, customerPhone: fullPhone,
-          address: orderType==="dine_in"
-            ? `${selectedFilial ? selectedFilial.name+", " : ""}Stol №${tableNumber}`
+          address: orderType==="pickup"
+            ? (selectedFilial ? selectedFilial.name : "")
             : form.address,
           location: orderType==="delivery" ? location : null,
-          orderType, tableNumber: orderType==="dine_in" ? tableNumber : null,
+          orderType,
           paymentType,
           filialId: selectedFilial?.id || null,
           filialName: selectedFilial?.name || null,
@@ -214,10 +212,10 @@ export default function CartPage() {
       <div style={{fontSize:"4rem"}}>🎉</div>
       <h2 className="cp-success-title">{t.orderAccepted}</h2>
       <p className="cp-success-sub">
-        {orderType==="dine_in" ? t.restaurantOrder?.replace("{n}", tableNumber) : t.deliveryOrderSuccess}
+        {orderType==="pickup" ? t.pickupOrderSuccess : t.deliveryOrderSuccess}
       </p>
       <div style={{background:"#f0fdf4",borderRadius:14,padding:"12px 24px",fontSize:"0.9rem",fontWeight:700,color:"#065f46",display:"flex",gap:12,flexWrap:"wrap",justifyContent:"center"}}>
-        <span>{orderType==="dine_in" ? "🍽 Restoran" : "🛵 Yetkazish"}</span>
+        <span>{orderType==="pickup" ? `🛍 ${t.pickup}` : "🛵 Yetkazish"}</span>
         <span>•</span>
         <span>💳 {paymentLabel(paymentType)}</span>
       </div>
@@ -298,18 +296,18 @@ export default function CartPage() {
           <p className="cp-section-q">{t.orderTypeTitle}</p>
 
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {/* Restoran */}
-            <div className={`order-type-card ${orderType==="dine_in"?"selected":""}`} onClick={() => setOrderType("dine_in")}>
-              <div className="order-type-icon">🍽</div>
+            {/* Olib ketish */}
+            <div className={`order-type-card ${orderType==="pickup"?"selected":""}`} onClick={() => setOrderType("pickup")}>
+              <div className="order-type-icon">🛍</div>
               <div className="order-type-info">
-                <div className="order-type-title">{t.dineIn}</div>
-                <div className="order-type-desc">{t.dineInDesc}</div>
+                <div className="order-type-title">{t.pickup}</div>
+                <div className="order-type-desc">{t.pickupDesc}</div>
               </div>
-              <div className={`order-type-check ${orderType==="dine_in"?"active":""}`}>✓</div>
+              <div className={`order-type-check ${orderType==="pickup"?"active":""}`}>✓</div>
             </div>
-            {orderType==="dine_in" && (
+            {orderType==="pickup" && (
               <div style={{display:"flex",flexDirection:"column",gap:10,padding:"14px 16px",background:"#f0fdf4",borderRadius:14,border:"2px solid var(--g3)"}}>
-                <label style={{fontSize:"0.82rem",fontWeight:700,color:"var(--g4)"}}>🏠 Filial tanlang</label>
+                <label style={{fontSize:"0.82rem",fontWeight:700,color:"var(--g4)"}}>🏠 Qaysi filialdan olib ketasiz?</label>
                 {FILIALS.map(f => (
                   <div key={f.id} className={`order-type-card ${selectedFilial?.id===f.id?"selected":""}`}
                     style={{padding:"10px 14px"}} onClick={() => setSelectedFilial(f)}>
@@ -318,11 +316,6 @@ export default function CartPage() {
                     <div className={`order-type-check ${selectedFilial?.id===f.id?"active":""}`}>✓</div>
                   </div>
                 ))}
-                <div className="cp-form-field" style={{marginTop:4}}>
-                  <label>{t.tableNumber}</label>
-                  <input type="number" placeholder={t.tableNumberPlaceholder} min="1"
-                    value={tableNumber} onChange={e => setTableNumber(e.target.value)} style={{marginTop:6}} />
-                </div>
               </div>
             )}
 
@@ -385,7 +378,7 @@ export default function CartPage() {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,flexWrap:"wrap",gap:8}}>
                 <p className="cp-summary-total">{t.total}: <strong>{total.toLocaleString()} so'm</strong></p>
                 <div style={{display:"flex",gap:6}}>
-                  <span className="order-badge blue">{orderType==="dine_in" ? `🍽 ${t.dineIn}` : `🛵 ${t.deliveryOrder}`}</span>
+                  <span className="order-badge blue">{orderType==="pickup" ? `🛍 ${t.pickup}` : `🛵 ${t.deliveryOrder}`}</span>
                   <span className="order-badge green">💳 {paymentLabel(paymentType)}</span>
                 </div>
               </div>
@@ -415,9 +408,9 @@ export default function CartPage() {
               <span className="cp-field-hint">{form.phoneFormatted.replace(/\s/g,"").length}/9 {t.phoneHint}{isValid(form.phoneFormatted)?" ✅":""}</span>
             </div>
 
-            {orderType==="dine_in" && (
+            {orderType==="pickup" && (
               <div style={{background:"#f0fdf4",borderRadius:14,padding:"14px 16px",border:"2px solid var(--g3)"}}>
-                <p style={{fontSize:"0.9rem",fontWeight:700,color:"#065f46"}}>🍽 Restoran — Stol №{tableNumber}</p>
+                <p style={{fontSize:"0.9rem",fontWeight:700,color:"#065f46"}}>🛍 {t.pickup} — {selectedFilial?.name}</p>
               </div>
             )}
 

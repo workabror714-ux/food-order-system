@@ -435,6 +435,7 @@ export default function Admin() {
   const newOrderCount = orders.filter(o => o.status === "new").length;
   const statusLabel = { new: "Yangi", preparing: "Tayyorlanmoqda", on_way: "Yo'lda", delivered: "Yetkazildi", cancelled: "Bekor" };
   const statusColor = { new: "#3b82f6", preparing: "#f59e0b", on_way: "#0ea5e9", delivered: "#10b981", cancelled: "#ef4444" };
+  const paymentStatusLabel = { paid: "To‘langan", unpaid: "To‘lanmagan (naqd)", pending: "Kutilmoqda", cancelled: "Bekor qilingan" };
 
   return (
     <div className="admin-root">
@@ -725,7 +726,7 @@ export default function Admin() {
                             {order.paymentType === "card" && "💳 Karta"}
                             {order.paymentStatus && (
                               <span className={`millenium-badge ${order.paymentStatus === "paid" ? "success" : "pending"}`}>
-                                To‘lov: {order.paymentStatus}
+                                To‘lov: {paymentStatusLabel[order.paymentStatus] || order.paymentStatus}
                               </span>
                             )}
                           </span>

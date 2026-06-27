@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import { compressImage, uploadToServer, getField, sortCategories, LANGS, LANG_LABELS } from "../adminUtils";
+import { AppIcon } from "../icons";
 
 // Taomlar tabi — forma, rasm yuklash, kategoriya, ro'yxat, modal.
 // foods/categories shell'da (Banner bilan bo'lishiladi) → prop orqali keladi.
@@ -58,7 +59,7 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
     try {
       const url = await uploadToServer(imageFile);
       setUploadedUrl(url); setImagePreview(url);
-      alert("✅ Rasm yuklandi!");
+      alert("Rasm yuklandi!");
     } catch (e) { alert("Yuklash xatosi: " + e.message); }
     finally { setUploading(false); }
   };
@@ -83,7 +84,7 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
       if (uploadedUrl) body.imageUrl = uploadedUrl;
       if (editId) await api.put(`/api/foods/${editId}`, body, true);
       else await api.post("/api/foods", body, true);
-      alert(editId ? "✅ Yangilandi!" : "✅ Qo'shildi!");
+      alert(editId ? "Yangilandi!" : "Qo'shildi!");
       resetForm(); refetch();
     } catch (err) { alert("Xato: " + err.message); }
     finally { setFoodLoading(false); }
@@ -121,7 +122,7 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
   return (
     <>
       <div className="admin-section">
-        <h2 className="section-title">{editId ? "✏️ Taomni tahrirlash" : "➕ Yangi taom qo'shish"}</h2>
+        <h2 className="section-title">{editId ? <><AppIcon name="edit" size={17} /> Taomni tahrirlash</> : <><AppIcon name="plus" size={17} /> Yangi taom qo'shish</>}</h2>
         <form onSubmit={handleFoodSubmit} className="food-form">
           <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
             {LANGS.map(l => (
@@ -156,7 +157,7 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
 
           <div className="availability-editor">
             <div>
-              <strong>{isAvailable ? "✅ Taom mavjud" : "❌ Hozircha yo‘q"}</strong>
+              <strong>{isAvailable ? <><AppIcon name="checkCircle" size={15} /> Taom mavjud</> : <><AppIcon name="ban" size={15} /> Hozircha yo‘q</>}</strong>
               <p>O‘chirib qo‘yilsa, mijoz savatga qo‘sha olmaydi.</p>
             </div>
             <label className="availability-switch">
@@ -194,14 +195,14 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
                     </div>
                   ))}
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button type="button" className="btn-primary" onClick={addCategory}>✅ Qo'shish</button>
+                    <button type="button" className="btn-primary" onClick={addCategory}><AppIcon name="check" size={15} /> Qo'shish</button>
                     <button type="button" className="btn-secondary" onClick={() => setShowCatInput(false)}>Bekor</button>
                   </div>
                 </div>
               )}
 
               {selectedCat.uz && (
-                <p className="selected-cat-label">✅ {selectedCat.uz}{selectedCat.ru && selectedCat.ru !== selectedCat.uz ? ` / ${selectedCat.ru}` : ""}</p>
+                <p className="selected-cat-label"><AppIcon name="check" size={14} /> {selectedCat.uz}{selectedCat.ru && selectedCat.ru !== selectedCat.uz ? ` / ${selectedCat.ru}` : ""}</p>
               )}
             </div>
           </div>
@@ -210,32 +211,32 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
             <label>Rasm {!editId && "*"}</label>
             <label className="upload-zone">
               <input type="file" accept="image/*" onChange={handleImageChange} hidden />
-              <span className="upload-zone-icon">📷</span>
+              <span className="upload-zone-icon"><AppIcon name="camera" size={26} /></span>
               <span className="upload-zone-text">
                 {imageFile ? imageFile.name : (uploadedUrl ? "Rasm yuklandi — almashtirish uchun bosing" : "Rasm tanlash uchun bosing")}
               </span>
             </label>
-            {compressing && <p style={{ color: "var(--g)", fontSize: "0.82rem", marginTop: 4 }}>⏳ Optimallashtirilmoqda...</p>}
+            {compressing && <p style={{ color: "var(--g)", fontSize: "0.82rem", marginTop: 4 }}>Optimallashtirilmoqda...</p>}
 
             {imageFile && !uploadedUrl && !compressing && (
               <button type="button" className="btn-primary" style={{ marginTop: 10 }} onClick={handleUpload} disabled={uploading}>
-                {uploading ? "⏳ Yuklanmoqda..." : "☁️ Serverga yuklash"}
+                {uploading ? "Yuklanmoqda..." : <><AppIcon name="cloud" size={16} /> Serverga yuklash</>}
               </button>
             )}
 
             {uploadedUrl && (
               <div style={{ marginTop: 8, padding: "8px 12px", background: "#d1fae5", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontSize: "0.85rem", color: "#065f46", fontWeight: 700 }}>
-                  ✅ Rasm yuklandi! {imageFile && `(${Math.round(imageFile.size / 1024)} KB)`}
+                  <AppIcon name="checkCircle" size={14} /> Rasm yuklandi! {imageFile && `(${Math.round(imageFile.size / 1024)} KB)`}
                 </span>
                 <button type="button" onClick={() => { setUploadedUrl(""); setImagePreview(null); setImageFile(null); }}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "#e53e3e", fontSize: 18 }}>✕</button>
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "#e53e3e", fontSize: 18 }}><AppIcon name="close" size={18} /></button>
               </div>
             )}
 
             {!editId && !uploadedUrl && (
               <p style={{ fontSize: "0.78rem", color: "#e53e3e", marginTop: 6, fontWeight: 600 }}>
-                ⚠️ Fayl tanlang → "Serverga yuklash" tugmasini bosing!
+                <AppIcon name="warning" size={14} /> Fayl tanlang → "Serverga yuklash" tugmasini bosing!
               </p>
             )}
 
@@ -247,7 +248,7 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
 
           <div className="form-actions">
             <button type="submit" className="btn-primary" disabled={foodLoading || compressing || uploading}>
-              {foodLoading ? "Saqlanmoqda..." : editId ? "💾 Saqlash" : "➕ Qo'shish"}
+              {foodLoading ? "Saqlanmoqda..." : editId ? <><AppIcon name="save" size={16} /> Saqlash</> : <><AppIcon name="plus" size={16} /> Qo'shish</>}
             </button>
             {editId && <button type="button" className="btn-secondary" onClick={resetForm}>Bekor qilish</button>}
           </div>
@@ -255,7 +256,7 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
       </div>
 
       <div className="admin-section">
-        <h2 className="section-title">📋 Mavjud taomlar ({foods.length})</h2>
+        <h2 className="section-title"><AppIcon name="list" size={18} /> Mavjud taomlar ({foods.length})</h2>
         <div className="food-admin-grid">
           {foods.map(food => (
             <div key={food._id} className={`food-admin-card ${food.isAvailable === false ? "unavailable" : ""}`} onClick={() => setSelectedFood(food)}>
@@ -273,11 +274,11 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
                 <p className="food-admin-price">{food.price?.toLocaleString()} so'm</p>
                 <p className="food-admin-desc">{getField(food.description, "uz")}</p>
                 <div className="food-admin-btns" onClick={e => e.stopPropagation()}>
-                  <button className="btn-edit" onClick={() => handleEdit(food)}>✏️ Tahrirlash</button>
+                  <button className="btn-edit" onClick={() => handleEdit(food)}><AppIcon name="edit" size={15} /> Tahrirlash</button>
                   <button className={food.isAvailable === false ? "btn-available" : "btn-unavailable"} onClick={(e) => toggleFoodAvailability(food, e)}>
-                    {food.isAvailable === false ? "✅ Sotuvga qaytarish" : "🚫 Sotuvdan olish"}
+                    {food.isAvailable === false ? <><AppIcon name="checkCircle" size={15} /> Sotuvga qaytarish</> : <><AppIcon name="ban" size={15} /> Sotuvdan olish</>}
                   </button>
-                  <button className="btn-delete" onClick={() => handleDelete(food._id)}>🗑 O'chirish</button>
+                  <button className="btn-delete" onClick={() => handleDelete(food._id)}><AppIcon name="trash" size={15} /> O'chirish</button>
                 </div>
               </div>
             </div>
@@ -288,7 +289,7 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
       {selectedFood && (
         <div className="modal-overlay" onClick={() => setSelectedFood(null)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setSelectedFood(null)}>✕</button>
+            <button className="modal-close" onClick={() => setSelectedFood(null)}><AppIcon name="close" size={20} /></button>
             <img src={selectedFood.image || "https://placehold.co/400x200/e8f5ee/1d6b3e?text=Rasm"}
               alt={getField(selectedFood.title, "uz")} className="modal-img"
               onError={e => e.target.src = "https://placehold.co/400x200/e8f5ee/1d6b3e?text=Rasm"} />
@@ -301,11 +302,11 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
               <p className="modal-price">{selectedFood.price?.toLocaleString()} so'm</p>
               <p className="modal-desc">{getField(selectedFood.description, "uz")}</p>
               <div className="modal-actions">
-                <button className="btn-edit" onClick={() => handleEdit(selectedFood)}>✏️ Tahrirlash</button>
+                <button className="btn-edit" onClick={() => handleEdit(selectedFood)}><AppIcon name="edit" size={15} /> Tahrirlash</button>
                 <button className={selectedFood.isAvailable === false ? "btn-available" : "btn-unavailable"} onClick={(e) => toggleFoodAvailability(selectedFood, e)}>
-                  {selectedFood.isAvailable === false ? "✅ Sotuvga qaytarish" : "🚫 Sotuvdan olish"}
+                  {selectedFood.isAvailable === false ? <><AppIcon name="checkCircle" size={15} /> Sotuvga qaytarish</> : <><AppIcon name="ban" size={15} /> Sotuvdan olish</>}
                 </button>
-                <button className="btn-delete" onClick={() => handleDelete(selectedFood._id)}>🗑 O'chirish</button>
+                <button className="btn-delete" onClick={() => handleDelete(selectedFood._id)}><AppIcon name="trash" size={15} /> O'chirish</button>
               </div>
             </div>
           </div>

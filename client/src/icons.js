@@ -13,7 +13,7 @@ import {
   Smartphone, Home, Car, ClipboardList, Pencil, Plus, Save, Image as ImageIcon,
   ChefHat, Clock, PartyPopper, Rocket, Map as MapIcon, RefreshCw, AlertTriangle,
   Lock, Frown, Inbox, CircleHelp, Building2, Calendar, Mail, FileText, Palette,
-  Megaphone, Eye, Ban, Cloud, Camera, Globe, ArrowRight, ArrowLeft, Tag,
+  Megaphone, Eye, Ban, Cloud, Camera, Globe, ArrowRight, ArrowLeft, Tag, Video,
 } from "lucide-react";
 
 // Butun ilova uchun yagona stroke qalinligi (minimalistik ko'rinish)
@@ -89,7 +89,7 @@ const REGISTRY = {
   // strelkalar
   arrowRight: ArrowRight, arrowLeft: ArrowLeft,
   // promo / mashhur
-  flame: Flame, tag: Tag,
+  flame: Flame, tag: Tag, video: Video,
 };
 
 export function AppIcon({ name, size = 20, strokeWidth = DEFAULT_STROKE, className, ...rest }) {

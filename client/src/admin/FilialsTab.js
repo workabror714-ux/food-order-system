@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { AppIcon } from "../icons";
 
 const emptyFilialForm = { name: "", address: "", lat: "", lng: "", isActive: true };
 
@@ -49,7 +50,7 @@ export default function FilialsTab() {
 
   return (
     <div className="admin-section">
-      <h2 className="section-title">🏢 {editingFilialId ? "Filialni tahrirlash" : "Yangi filial qo'shish"}</h2>
+      <h2 className="section-title"><AppIcon name="building" size={18} /> {editingFilialId ? "Filialni tahrirlash" : "Yangi filial qo'shish"}</h2>
       <form className="banner-form" onSubmit={saveFilial}>
         <div className="input-group">
           <label>Filial nomi *</label>
@@ -78,11 +79,11 @@ export default function FilialsTab() {
           </div>
         </div>
         <p style={{ fontSize: "0.78rem", color: "var(--gray)", marginTop: -4 }}>
-          📍 Koordinatani Yandex/Google xaritadan oling — taxi narxi shunga bog'liq.
+          <AppIcon name="location" size={14} /> Koordinatani Yandex/Google xaritadan oling — taxi narxi shunga bog'liq.
         </p>
         <label className="availability-editor" style={{ cursor: "pointer" }}>
           <div>
-            <strong>{filialForm.isActive ? "✅ Ochiq (mijozga ko'rinadi)" : "⏸ Vaqtincha yopiq"}</strong>
+            <strong>{filialForm.isActive ? <><AppIcon name="checkCircle" size={15} /> Ochiq (mijozga ko'rinadi)</> : <><AppIcon name="ban" size={15} /> Vaqtincha yopiq</>}</strong>
             <p>Yopiq filial mijozga ko'rinadi, lekin tanlab bo'lmaydi</p>
           </div>
           <label className="availability-switch">
@@ -92,33 +93,33 @@ export default function FilialsTab() {
           </label>
         </label>
         <div style={{ display: "flex", gap: 10 }}>
-          <button type="submit" className="btn-save">{editingFilialId ? "💾 Saqlash" : "➕ Qo'shish"}</button>
+          <button type="submit" className="btn-save">{editingFilialId ? <><AppIcon name="save" size={16} /> Saqlash</> : <><AppIcon name="plus" size={16} /> Qo'shish</>}</button>
           {editingFilialId && (
             <button type="button" className="btn-cancel" onClick={resetFilialForm}>Bekor qilish</button>
           )}
         </div>
       </form>
 
-      <h2 className="section-title" style={{ marginTop: 24 }}>📋 Filiallar ({filials.length})</h2>
+      <h2 className="section-title" style={{ marginTop: 24 }}><AppIcon name="list" size={18} /> Filiallar ({filials.length})</h2>
       <div className="admins-list">
         {filials.length === 0 && <p style={{ color: "var(--gray)" }}>Filiallar yo'q.</p>}
         {filials.map(f => (
           <div key={f._id} className="admin-row" style={{ opacity: f.isActive === false ? 0.65 : 1 }}>
-            <div className="admin-avatar">🏢</div>
+            <div className="admin-avatar"><AppIcon name="building" size={20} /></div>
             <div style={{ flex: 1 }}>
               <p className="admin-row-name">
-                {f.name} {f.isActive === false && <span style={{ color: "#b91c1c", fontWeight: 700 }}>— ⏸ Yopiq</span>}
+                {f.name} {f.isActive === false && <span style={{ color: "#b91c1c", fontWeight: 700 }}>— <AppIcon name="ban" size={13} /> Yopiq</span>}
               </p>
               <p className="admin-row-role">
-                {f.address || "Manzil yo'q"}{(f.lat && f.lng) ? ` · ${f.lat}, ${f.lng}` : " · 📍 koordinata yo'q"}
+                {f.address || "Manzil yo'q"}{(f.lat && f.lng) ? ` · ${f.lat}, ${f.lng}` : " · koordinata yo'q"}
               </p>
             </div>
             <div className="food-admin-btns">
               <button className={f.isActive === false ? "btn-available" : "btn-unavailable"} onClick={() => toggleFilial(f)}>
-                {f.isActive === false ? "✅ Ochish" : "⏸ Yopish"}
+                {f.isActive === false ? <><AppIcon name="checkCircle" size={15} /> Ochish</> : <><AppIcon name="ban" size={15} /> Yopish</>}
               </button>
-              <button className="btn-edit" onClick={() => editFilial(f)}>✏️</button>
-              <button className="btn-delete" onClick={() => deleteFilial(f)}>🗑</button>
+              <button className="btn-edit" onClick={() => editFilial(f)}><AppIcon name="edit" size={16} /></button>
+              <button className="btn-delete" onClick={() => deleteFilial(f)}><AppIcon name="trash" size={16} /></button>
             </div>
           </div>
         ))}

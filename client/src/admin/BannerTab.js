@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { AppIcon } from "../icons";
 
 const defaultBannerForm = { title:"", subtitle:"", description:"", bgColor:"#1a5c30", mediaType:"none", mediaUrl:"", buttonText:"", buttonLink:"", startDate:"", endDate:"", order:0, isActive:true, events:[], promoCategory:"", promoLabel:"Aksiya taomlar" };
 
@@ -34,7 +35,7 @@ export default function BannerTab({ categories, savedUser }) {
       });
       if (editBanner) await api.upload(`/api/banners/${editBanner}`, fd, "PUT");
       else await api.upload("/api/banners", fd, "POST");
-      alert(editBanner ? "✅ Yangilandi!" : "✅ Banner qo'shildi!");
+      alert(editBanner ? "Yangilandi!" : "Banner qo'shildi!");
       setShowBannerForm(false); setEditBanner(null); setBannerForm(defaultBannerForm);
       setBannerMediaFile(null); fetchBanners();
     } catch (e) { alert("Xato: " + e.message); }
@@ -57,7 +58,7 @@ export default function BannerTab({ categories, savedUser }) {
       {/* Banner ro'yxati */}
       <div className="admin-section">
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <h2 className="section-title" style={{marginBottom:0}}>🎨 Bannerlar ({banners.length})</h2>
+          <h2 className="section-title" style={{marginBottom:0}}><AppIcon name="palette" size={18} /> Bannerlar ({banners.length})</h2>
           {savedUser.role === "superadmin" && (
             <button className="btn-primary" onClick={() => { setEditBanner(null); setBannerForm(defaultBannerForm); setShowBannerForm(true); }}>
               + Yangi banner
@@ -88,13 +89,13 @@ export default function BannerTab({ categories, savedUser }) {
                     )}
                   </div>
                   <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end"}}>
-                    {b.startDate && <span style={{background:"rgba(0,0,0,0.3)",color:"white",padding:"2px 8px",borderRadius:10,fontSize:"0.7rem"}}>🕐 {new Date(b.startDate).toLocaleDateString()}</span>}
-                    {b.endDate && <span style={{background:"rgba(0,0,0,0.3)",color:"white",padding:"2px 8px",borderRadius:10,fontSize:"0.7rem"}}>⏰ {new Date(b.endDate).toLocaleDateString()}</span>}
+                    {b.startDate && <span style={{background:"rgba(0,0,0,0.3)",color:"white",padding:"2px 8px",borderRadius:10,fontSize:"0.7rem",display:"inline-flex",alignItems:"center",gap:4}}><AppIcon name="clock" size={12} /> {new Date(b.startDate).toLocaleDateString()}</span>}
+                    {b.endDate && <span style={{background:"rgba(0,0,0,0.3)",color:"white",padding:"2px 8px",borderRadius:10,fontSize:"0.7rem",display:"inline-flex",alignItems:"center",gap:4}}><AppIcon name="clock" size={12} /> {new Date(b.endDate).toLocaleDateString()}</span>}
                   </div>
                 </div>
                 <div style={{padding:"10px 14px",display:"flex",gap:8,alignItems:"center"}}>
                   <span style={{fontSize:"0.78rem",color:b.isActive?"var(--g)":"#ef4444",fontWeight:700,flex:1}}>
-                    {b.isActive ? "✅ Faol" : "❌ Nofaol"}
+                    {b.isActive ? <><AppIcon name="checkCircle" size={14} /> Faol</> : <><AppIcon name="ban" size={14} /> Nofaol</>}
                     {b.endDate && new Date(b.endDate) < new Date() ? " (muddati o'tgan)" : ""}
                   </span>
                   <span style={{fontSize:"0.75rem",color:"var(--gray)"}}>Tartib: {b.order}</span>
@@ -112,8 +113,8 @@ export default function BannerTab({ categories, savedUser }) {
                           promoCategory: b.promoCategory || "", promoLabel: b.promoLabel || "Aksiya taomlar",
                         });
                         setShowBannerForm(true);
-                      }}>✏️ Tahrirlash</button>
-                      <button className="btn-delete" onClick={() => deleteBanner(b._id)}>🗑</button>
+                      }}><AppIcon name="edit" size={15} /> Tahrirlash</button>
+                      <button className="btn-delete" onClick={() => deleteBanner(b._id)}><AppIcon name="trash" size={16} /></button>
                     </>
                   )}
                 </div>
@@ -126,7 +127,7 @@ export default function BannerTab({ categories, savedUser }) {
       {/* Banner forma (superadmin) */}
       {showBannerForm && savedUser.role === "superadmin" && (
         <div className="admin-section">
-          <h2 className="section-title">{editBanner ? "✏️ Bannerni tahrirlash" : "➕ Yangi banner"}</h2>
+          <h2 className="section-title">{editBanner ? <><AppIcon name="edit" size={17} /> Bannerni tahrirlash</> : <><AppIcon name="plus" size={17} /> Yangi banner</>}</h2>
           <div className="food-form">
             <div className="form-grid">
               <div className="input-group"><label>Sarlavha *</label><input type="text" value={bannerForm.title} onChange={e => setBannerForm(f=>({...f,title:e.target.value}))} /></div>
@@ -143,7 +144,7 @@ export default function BannerTab({ categories, savedUser }) {
             </div>
 
             <div style={{background:"#fff9e6",borderRadius:14,padding:16,border:"2px solid #fde68a"}}>
-              <p style={{fontWeight:800,fontSize:"0.88rem",marginBottom:12,color:"#92400e"}}>🔥 Banner ostida aksiya taomlar</p>
+              <p style={{fontWeight:800,fontSize:"0.88rem",marginBottom:12,color:"#92400e"}}><AppIcon name="tag" size={15} /> Banner ostida aksiya taomlar</p>
               <div className="form-grid">
                 <div className="input-group">
                   <label>Kategoriya (aksiya uchun)</label>
@@ -164,7 +165,7 @@ export default function BannerTab({ categories, savedUser }) {
             </div>
 
             <div style={{background:"var(--g3)",borderRadius:14,padding:16}}>
-              <p style={{fontWeight:700,fontSize:"0.88rem",marginBottom:12}}>⏰ Muddatli aksiya (ixtiyoriy)</p>
+              <p style={{fontWeight:700,fontSize:"0.88rem",marginBottom:12}}><AppIcon name="clock" size={15} /> Muddatli aksiya (ixtiyoriy)</p>
               <div className="form-grid">
                 <div className="input-group">
                   <label>Boshlanish sanasi</label>
@@ -175,7 +176,7 @@ export default function BannerTab({ categories, savedUser }) {
                   <input type="date" value={bannerForm.endDate} onChange={e => setBannerForm(f=>({...f,endDate:e.target.value}))} />
                 </div>
               </div>
-              <p style={{fontSize:"0.75rem",color:"var(--gray)",marginTop:8}}>⚠️ Tugash sanasi o'tsa — banner avtomatik yashirinadi</p>
+              <p style={{fontSize:"0.75rem",color:"var(--gray)",marginTop:8}}><AppIcon name="warning" size={14} /> Tugash sanasi o'tsa — banner avtomatik yashirinadi</p>
             </div>
 
             <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"white",borderRadius:12,border:"2px solid var(--border)"}}>
@@ -191,7 +192,7 @@ export default function BannerTab({ categories, savedUser }) {
                 {["none","image","video"].map(type => (
                   <button key={type} type="button" className={`cat-chip ${bannerForm.mediaType===type?"selected":""}`}
                     onClick={() => setBannerForm(f=>({...f,mediaType:type}))}>
-                    {type==="none"?"🚫 Yo'q":type==="image"?"🖼 Rasm":"🎬 Video"}
+                    {type==="none"?<><AppIcon name="ban" size={14} /> Yo'q</>:type==="image"?<><AppIcon name="image" size={14} /> Rasm</>:<><AppIcon name="video" size={14} /> Video</>}
                   </button>
                 ))}
               </div>
@@ -215,13 +216,13 @@ export default function BannerTab({ categories, savedUser }) {
             )}
 
             <div>
-              <label style={{fontSize:"0.82rem",fontWeight:700,color:"var(--gray)",display:"block",marginBottom:8}}>🎪 Chip/Event labellar</label>
+              <label style={{fontSize:"0.82rem",fontWeight:700,color:"var(--gray)",display:"block",marginBottom:8}}><AppIcon name="tag" size={14} /> Chip/Event labellar</label>
               <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:10}}>
                 {bannerForm.events.map(ev => (
                   <span key={ev.id} style={{display:"flex",alignItems:"center",gap:6,background:"var(--g3)",padding:"5px 12px",borderRadius:20,fontSize:"0.85rem"}}>
                     {ev.emoji} {ev.label}
                     <button onClick={() => setBannerForm(f=>({...f,events:f.events.filter(e=>e.id!==ev.id)}))}
-                      style={{background:"none",border:"none",cursor:"pointer",color:"#e53e3e",fontSize:14}}>✕</button>
+                      style={{background:"none",border:"none",cursor:"pointer",color:"#e53e3e",fontSize:14}}><AppIcon name="close" size={14} /></button>
                   </span>
                 ))}
               </div>
@@ -237,7 +238,7 @@ export default function BannerTab({ categories, savedUser }) {
 
             <div className="form-actions">
               <button type="button" className="btn-primary" onClick={saveBanner} disabled={bannerLoading}>
-                {bannerLoading ? "Saqlanmoqda..." : editBanner ? "💾 Saqlash" : "➕ Qo'shish"}
+                {bannerLoading ? "Saqlanmoqda..." : editBanner ? <><AppIcon name="save" size={16} /> Saqlash</> : <><AppIcon name="plus" size={16} /> Qo'shish</>}
               </button>
               <button type="button" className="btn-secondary" onClick={() => { setShowBannerForm(false); setEditBanner(null); }}>
                 Bekor qilish

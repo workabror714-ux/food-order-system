@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { AppIcon } from "../icons";
 
 // Adminlar tabi — to'liq mustaqil (o'z holati, kross-tab bog'liqlik yo'q)
 export default function AdminsTab({ savedUser }) {
@@ -18,7 +19,7 @@ export default function AdminsTab({ savedUser }) {
     e.preventDefault();
     try {
       await api.post("/auth/create-admin", { username: newUsername, password: newPassword, role: newRole }, true);
-      alert("✅ Admin yaratildi!");
+      alert("Admin yaratildi!");
       setNewUsername(""); setNewPassword(""); fetchAdmins();
     } catch (err) { alert(err.message); }
   };
@@ -30,7 +31,7 @@ export default function AdminsTab({ savedUser }) {
 
   return (
     <div className="admin-section">
-      <h2 className="section-title">👤 Admin yaratish</h2>
+      <h2 className="section-title"><AppIcon name="addUser" size={18} /> Admin yaratish</h2>
       <form onSubmit={handleCreateAdmin} className="food-form" style={{ maxWidth: 420 }}>
         <div className="input-group"><label>Username *</label><input type="text" value={newUsername} onChange={e => setNewUsername(e.target.value)} required /></div>
         <div className="input-group"><label>Parol *</label><input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required /></div>
@@ -40,7 +41,7 @@ export default function AdminsTab({ savedUser }) {
             <option value="superadmin">Superadmin</option>
           </select>
         </div>
-        <button type="submit" className="btn-primary">➕ Admin yaratish</button>
+        <button type="submit" className="btn-primary"><AppIcon name="plus" size={16} /> Admin yaratish</button>
       </form>
       <h2 className="section-title" style={{ marginTop: 32 }}>Adminlar ro'yxati</h2>
       <div className="admins-list">
@@ -50,7 +51,7 @@ export default function AdminsTab({ savedUser }) {
             <div><p className="admin-row-name">{adm.username}</p><p className="admin-row-role">{adm.role}</p></div>
             {adm.username !== savedUser.username && (
               <button className="btn-delete" style={{ marginLeft: "auto", flex: "none" }}
-                onClick={() => handleDeleteAdmin(adm._id)}>🗑</button>
+                onClick={() => handleDeleteAdmin(adm._id)}><AppIcon name="trash" size={16} /></button>
             )}
           </div>
         ))}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { AppIcon } from "../icons";
 
 const statusLabel = { new: "Yangi", preparing: "Tayyorlanmoqda", on_way: "Yo'lda", delivered: "Yetkazildi", cancelled: "Bekor" };
 const statusColor = { new: "#3b82f6", preparing: "#f59e0b", on_way: "#0ea5e9", delivered: "#10b981", cancelled: "#ef4444" };
@@ -34,8 +35,8 @@ export default function OrdersTab({ onNewCount }) {
   return (
     <div className="admin-section">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 className="section-title" style={{ marginBottom: 0 }}>📋 Buyurtmalar</h2>
-        <button className="filter-btn" onClick={fetchOrders}>🔄 Yangilash</button>
+        <h2 className="section-title" style={{ marginBottom: 0 }}><AppIcon name="list" size={18} /> Buyurtmalar</h2>
+        <button className="filter-btn" onClick={fetchOrders}><AppIcon name="refresh" size={15} /> Yangilash</button>
       </div>
       <div className="order-filter-bar">
         {["all", "new", "preparing", "on_way", "delivered", "cancelled"].map(s => (
@@ -60,28 +61,28 @@ export default function OrdersTab({ onNewCount }) {
               <div className="order-card-header">
                 <div>
                   <span className="order-name">{order.customerName}</span>
-                  <span className="order-phone">📞 {order.customerPhone}</span>
-                  {order.address && <span className="order-address">📍 {order.address}</span>}
+                  <span className="order-phone"><AppIcon name="phone" size={13} /> {order.customerPhone}</span>
+                  {order.address && <span className="order-address"><AppIcon name="location" size={13} /> {order.address}</span>}
                   {order.location && (
                     <a className="order-address"
                       href={`https://yandex.com/maps/?pt=${order.location.lng},${order.location.lat}&z=16&l=map`}
-                      target="_blank" rel="noreferrer">🗺 Xaritada ko'rish</a>
+                      target="_blank" rel="noreferrer"><AppIcon name="map" size={13} /> Xaritada ko'rish</a>
                   )}
                   {order.orderType === "pickup" && (
-                    <span className="order-address">🛍 Olib ketish{order.filialName ? ` — ${order.filialName}` : ""}</span>
+                    <span className="order-address"><AppIcon name="bag" size={13} /> Olib ketish{order.filialName ? ` — ${order.filialName}` : ""}</span>
                   )}
                   {order.orderType === "delivery" && (
                     <span className={`millenium-badge ${order.milleniumOrderId ? "success" : "pending"}`}>
-                      🚕 Millenium: {order.milleniumOrderId ? `#${order.milleniumOrderId}` : "yuborilmagan"}
+                      <AppIcon name="taxi" size={13} /> Millenium: {order.milleniumOrderId ? `#${order.milleniumOrderId}` : "yuborilmagan"}
                       {(order.driverName || order.driverPhone || order.carModel) && (
                         <div className="driver-info-box">
-                          <div className="driver-info-title">🚗 Kuryer ma'lumotlari</div>
-                          {order.driverName && <div>👤 {order.driverName}</div>}
-                          {order.driverPhone && <div>📞 {order.driverPhone}</div>}
-                          {order.carModel && <div>🚙 {order.carModel}</div>}
+                          <div className="driver-info-title"><AppIcon name="taxi" size={14} /> Kuryer ma'lumotlari</div>
+                          {order.driverName && <div><AppIcon name="user" size={13} /> {order.driverName}</div>}
+                          {order.driverPhone && <div><AppIcon name="phone" size={13} /> {order.driverPhone}</div>}
+                          {order.carModel && <div><AppIcon name="taxi" size={13} /> {order.carModel}</div>}
                           {order.driverLocation?.lat && (
                             <a href={`https://yandex.com/maps/?pt=${order.driverLocation.lng},${order.driverLocation.lat}&z=16&l=map`}
-                              target="_blank" rel="noreferrer">🗺 Kuryerni xaritada ko‘rish</a>
+                              target="_blank" rel="noreferrer"><AppIcon name="map" size={13} /> Kuryerni xaritada ko‘rish</a>
                           )}
                         </div>
                       )}
@@ -95,10 +96,10 @@ export default function OrdersTab({ onNewCount }) {
                   </span>
                   {order.paymentType && (
                     <span style={{ fontSize: "0.72rem", color: "#888", display: "block", marginTop: 2 }}>
-                      {order.paymentType === "cash" && "💵 Naqd"}
-                      {order.paymentType === "click" && "🟦 Click"}
-                      {order.paymentType === "payme" && "🟩 Payme"}
-                      {order.paymentType === "card" && "💳 Karta"}
+                      {order.paymentType === "cash" && <><AppIcon name="money" size={13} /> Naqd</>}
+                      {order.paymentType === "click" && <><AppIcon name="card" size={13} /> Click</>}
+                      {order.paymentType === "payme" && <><AppIcon name="card" size={13} /> Payme</>}
+                      {order.paymentType === "card" && <><AppIcon name="card" size={13} /> Karta</>}
                       {order.paymentStatus && (
                         <span className={`millenium-badge ${order.paymentStatus === "paid" ? "success" : "pending"}`}>
                           To‘lov: {paymentStatusLabel[order.paymentStatus] || order.paymentStatus}
@@ -118,18 +119,18 @@ export default function OrdersTab({ onNewCount }) {
                 <span className="order-total">Jami: <strong>{order.totalPrice?.toLocaleString()} so'm</strong></span>
                 <div className="order-actions">
                   {order.status === "new" && (
-                    <button className="status-btn preparing" onClick={() => updateOrderStatus(order._id, "preparing")}>🍳 Tayyorlash</button>
+                    <button className="status-btn preparing" onClick={() => updateOrderStatus(order._id, "preparing")}><AppIcon name="chef" size={15} /> Tayyorlash</button>
                   )}
                   {order.status === "preparing" && order.orderType === "delivery" && (
-                    <button className="status-btn preparing" onClick={() => updateOrderStatus(order._id, "on_way")}>🚕 Yo'lda</button>
+                    <button className="status-btn preparing" onClick={() => updateOrderStatus(order._id, "on_way")}><AppIcon name="taxi" size={15} /> Yo'lda</button>
                   )}
                   {((order.status === "preparing" && order.orderType !== "delivery") || order.status === "on_way") && (
-                    <button className="status-btn delivered" onClick={() => updateOrderStatus(order._id, "delivered")}>✅ Yetkazildi</button>
+                    <button className="status-btn delivered" onClick={() => updateOrderStatus(order._id, "delivered")}><AppIcon name="check" size={15} /> Yetkazildi</button>
                   )}
                   {(order.status === "new" || order.status === "preparing" || order.status === "on_way") && (
-                    <button className="status-btn cancelled" onClick={() => updateOrderStatus(order._id, "cancelled")}>✕ Bekor</button>
+                    <button className="status-btn cancelled" onClick={() => updateOrderStatus(order._id, "cancelled")}><AppIcon name="close" size={15} /> Bekor</button>
                   )}
-                  <button className="status-btn delete-order" onClick={() => deleteOrder(order._id)}>🗑</button>
+                  <button className="status-btn delete-order" onClick={() => deleteOrder(order._id)}><AppIcon name="trash" size={15} /></button>
                 </div>
               </div>
             </div>

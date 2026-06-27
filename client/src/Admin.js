@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { LOGO_WHITE } from "./i18n";
+import { AppIcon } from "./icons";
 import { api } from "./api";
 import { getField, sortCategories } from "./adminUtils";
 import FoodsTab from "./admin/FoodsTab";
@@ -51,14 +52,14 @@ export default function Admin() {
       </div>
 
       <div className="admin-tabs">
-        <button className={`admin-tab ${tab === "foods" ? "active" : ""}`} onClick={() => setTab("foods")}>🍜 Taomlar</button>
+        <button className={`admin-tab ${tab === "foods" ? "active" : ""}`} onClick={() => setTab("foods")}><AppIcon name="menu" size={16} /> Taomlar</button>
         <button className={`admin-tab ${tab === "orders" ? "active" : ""}`} onClick={() => setTab("orders")}>
-          📋 Buyurtmalar {newOrderCount > 0 && <span className="tab-badge">{newOrderCount}</span>}
+          <AppIcon name="list" size={16} /> Buyurtmalar {newOrderCount > 0 && <span className="tab-badge">{newOrderCount}</span>}
         </button>
-        <button className={`admin-tab ${tab === "banner" ? "active" : ""}`} onClick={() => setTab("banner")}>🎨 Banner</button>
-        <button className={`admin-tab ${tab === "filials" ? "active" : ""}`} onClick={() => setTab("filials")}>🏢 Filiallar</button>
+        <button className={`admin-tab ${tab === "banner" ? "active" : ""}`} onClick={() => setTab("banner")}><AppIcon name="palette" size={16} /> Banner</button>
+        <button className={`admin-tab ${tab === "filials" ? "active" : ""}`} onClick={() => setTab("filials")}><AppIcon name="building" size={16} /> Filiallar</button>
         {savedUser.role === "superadmin" && (
-          <button className={`admin-tab ${tab === "admins" ? "active" : ""}`} onClick={() => setTab("admins")}>👤 Adminlar</button>
+          <button className={`admin-tab ${tab === "admins" ? "active" : ""}`} onClick={() => setTab("admins")}><AppIcon name="profile" size={16} /> Adminlar</button>
         )}
       </div>
 

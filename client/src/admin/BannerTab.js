@@ -30,7 +30,8 @@ export default function BannerTab({ categories, savedUser }) {
         mediaUrl = d.url;
       }
       const fd = new FormData();
-      Object.entries({ ...bannerForm, mediaUrl, events: JSON.stringify(bannerForm.events) }).forEach(([k, v]) => {
+      // Server `imageUrl` maydonini kutadi (mediaUrl emas) — bug tuzatildi
+      Object.entries({ ...bannerForm, mediaUrl, imageUrl: mediaUrl, events: JSON.stringify(bannerForm.events) }).forEach(([k, v]) => {
         if (v !== null && v !== undefined) fd.append(k, v);
       });
       if (editBanner) await api.upload(`/api/banners/${editBanner}`, fd, "PUT");
@@ -203,6 +204,16 @@ export default function BannerTab({ categories, savedUser }) {
                 <label>Rasm / Video</label>
                 <input type="file" accept={bannerForm.mediaType==="image"?"image/*":"video/*"}
                   onChange={e => setBannerMediaFile(e.target.files[0])} />
+                <p className="banner-media-hint">
+                  <AppIcon name="warning" size={15} />
+                  <span>
+                    Tavsiya: <b>16:6</b> nisbat (keng lenta).{" "}
+                    {bannerForm.mediaType==="image"
+                      ? <>O‘lcham ~<b>1600×600px</b>, format JPG / PNG / WebP, hajmi 1MB dan kam bo‘lsa yaxshi.</>
+                      : <>O‘lcham ~<b>1280×480px</b>, format MP4 / WebM, 5–10 soniya, ovozsiz, hajmi 8MB dan kam.</>}
+                    {" "}Matn media <b>pastki chap</b> burchakda chiqadi (o‘sha qism qoraytiriladi) — muhim detallarni markaz yoki yuqoriga joylang.
+                  </span>
+                </p>
                 {bannerForm.mediaUrl && (
                   <div style={{marginTop:8}}>
                     {bannerForm.mediaType==="image" ? (

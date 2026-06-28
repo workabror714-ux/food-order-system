@@ -315,24 +315,19 @@ function HeroBanner({ banners, t, foods, navigate }) {
         background: b.bgColor, position:"relative",
         overflow:"hidden", transition:"background 0.4s"
       }}>
-        {/* Background media */}
+        {/* Background media — to'liq ko'rinadi, ustiga o'qiladigan overlay */}
         {b.mediaType === "image" && b.mediaUrl && (
-          <img src={b.mediaUrl} alt="banner" style={{
-            position:"absolute",inset:0,width:"100%",height:"100%",
-            objectFit:"cover",opacity:0.35,zIndex:0
-          }} />
+          <img src={b.mediaUrl} alt="banner" className="g-hero-media" />
         )}
         {b.mediaType === "video" && b.mediaUrl && (
-          <video autoPlay muted loop playsInline style={{
-            position:"absolute",inset:0,width:"100%",height:"100%",
-            objectFit:"cover",opacity:0.35,zIndex:0
-          }}>
+          <video autoPlay muted loop playsInline className="g-hero-media">
             <source src={b.mediaUrl} />
           </video>
         )}
+        {b.mediaType !== "none" && b.mediaUrl && <div className="g-hero-overlay" />}
         <div style={{
           position:"absolute",bottom:0,left:0,right:0,
-          height:3,background:"rgba(163,212,91,0.5)",zIndex:1
+          height:3,background:"rgba(163,212,91,0.5)",zIndex:2
         }} />
 
         {/* Banner content */}

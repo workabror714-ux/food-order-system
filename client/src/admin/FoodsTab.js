@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { compressImage, uploadToServer, getField, sortCategories, LANGS, LANG_LABELS } from "../adminUtils";
 import { AppIcon } from "../icons";
+import { thumb } from "../img";
 
 // Taomlar tabi — forma, rasm yuklash, kategoriya, ro'yxat, modal.
 // foods/categories shell'da (Banner bilan bo'lishiladi) → prop orqali keladi.
@@ -241,7 +242,8 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
             )}
 
             {imagePreview && (
-              <img src={imagePreview} alt="preview"
+              <img src={thumb(imagePreview, 500)} alt="preview" decoding="async"
+                onError={e => { if (!e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = "1"; e.target.src = imagePreview; } }}
                 style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 12, border: "2px solid var(--border)", marginTop: 10 }} />
             )}
           </div>
@@ -261,9 +263,9 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
           {foods.map(food => (
             <div key={food._id} className={`food-admin-card ${food.isAvailable === false ? "unavailable" : ""}`} onClick={() => setSelectedFood(food)}>
               <div className="food-admin-img-wrap">
-                <img src={food.image || "https://placehold.co/200x120/e8f5ee/1d6b3e?text=Rasm"}
-                  alt={getField(food.title, "uz")} className="food-admin-img"
-                  onError={e => e.target.src = "https://placehold.co/200x120/e8f5ee/1d6b3e?text=Rasm"} />
+                <img src={thumb(food.image, 240) || "https://placehold.co/200x120/e8f5ee/1d6b3e?text=Rasm"}
+                  alt={getField(food.title, "uz")} className="food-admin-img" loading="lazy" decoding="async"
+                  onError={e => { const ph = "https://placehold.co/200x120/e8f5ee/1d6b3e?text=Rasm"; if (e.currentTarget.dataset.fb) { e.target.src = ph; } else { e.currentTarget.dataset.fb = "1"; e.target.src = food.image || ph; } }} />
                 <span className={`availability-badge ${food.isAvailable === false ? "off" : "on"}`}>
                   {food.isAvailable === false ? "Hozircha yo‘q" : "Mavjud"}
                 </span>
@@ -290,9 +292,9 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
         <div className="modal-overlay" onClick={() => setSelectedFood(null)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setSelectedFood(null)}><AppIcon name="close" size={20} /></button>
-            <img src={selectedFood.image || "https://placehold.co/400x200/e8f5ee/1d6b3e?text=Rasm"}
-              alt={getField(selectedFood.title, "uz")} className="modal-img"
-              onError={e => e.target.src = "https://placehold.co/400x200/e8f5ee/1d6b3e?text=Rasm"} />
+            <img src={thumb(selectedFood.image, 500) || "https://placehold.co/400x200/e8f5ee/1d6b3e?text=Rasm"}
+              alt={getField(selectedFood.title, "uz")} className="modal-img" decoding="async"
+              onError={e => { const ph = "https://placehold.co/400x200/e8f5ee/1d6b3e?text=Rasm"; if (e.currentTarget.dataset.fb) { e.target.src = ph; } else { e.currentTarget.dataset.fb = "1"; e.target.src = selectedFood.image || ph; } }} />
             <div className="modal-body">
               <span className="food-admin-cat">{getField(selectedFood.category, "uz")}</span>
               <span className={`availability-badge ${selectedFood.isAvailable === false ? "off" : "on"}`}>

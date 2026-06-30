@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { AppIcon } from "../icons";
+import { thumb } from "../img";
 
 const defaultBannerForm = { title:"", subtitle:"", description:"", bgColor:"#1a5c30", mediaType:"none", mediaUrl:"", buttonText:"", buttonLink:"", startDate:"", endDate:"", order:0, isActive:true, events:[], promoCategory:"", promoLabel:"Aksiya taomlar" };
 
@@ -77,7 +78,9 @@ export default function BannerTab({ categories, savedUser }) {
               <div key={b._id} style={{border:`2px solid ${b.isActive ? "var(--g3)" : "#fee2e2"}`,borderRadius:16,overflow:"hidden",background:"white"}}>
                 <div style={{background:b.bgColor,padding:"16px 18px",position:"relative",overflow:"hidden",minHeight:80,display:"flex",alignItems:"center",gap:12}}>
                   {b.mediaType==="image" && b.mediaUrl && (
-                    <img src={b.mediaUrl} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:0.3}} />
+                    <img src={thumb(b.mediaUrl, 600)} alt="" loading="lazy" decoding="async"
+                      onError={e => { if (!e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = "1"; e.target.src = b.mediaUrl; } }}
+                      style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:0.3}} />
                   )}
                   <div style={{position:"relative",zIndex:1,flex:1}}>
                     <div style={{fontWeight:900,color:"white",fontSize:"1rem"}}>{b.title}</div>
@@ -217,7 +220,9 @@ export default function BannerTab({ categories, savedUser }) {
                 {bannerForm.mediaUrl && (
                   <div style={{marginTop:8}}>
                     {bannerForm.mediaType==="image" ? (
-                      <img src={bannerForm.mediaUrl} alt="banner" style={{width:"100%",maxHeight:120,objectFit:"cover",borderRadius:10}} />
+                      <img src={thumb(bannerForm.mediaUrl, 600)} alt="banner" decoding="async"
+                        onError={e => { if (!e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = "1"; e.target.src = bannerForm.mediaUrl; } }}
+                        style={{width:"100%",maxHeight:120,objectFit:"cover",borderRadius:10}} />
                     ) : (
                       <video src={bannerForm.mediaUrl} style={{width:"100%",maxHeight:120,borderRadius:10}} controls />
                     )}

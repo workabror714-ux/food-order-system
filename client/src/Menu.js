@@ -328,20 +328,28 @@ function HeroBanner({ banners, t, foods, navigate }) {
         onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
         <div className={`g-hero-track${dragging ? "" : " animate"}`}
           style={{ transform: `translateX(calc(${-idx * 100}% + ${drag}px))` }}>
-          {banners.map((bn, i) => (
-            <div key={bn._id || i} className="g-hero-slide" style={{ background: bn.bgColor }}>
+          {banners.map((bn, i) => {
+            // To'liq-rasmli banner: matn (title) bo'sh va media bor bo'lsa —
+            // sayt overlay/logo/matnini ko'rsatmaymiz, faqat toza rasm chiqadi.
+            const isFull = !bn.title && bn.mediaType !== "none" && bn.mediaUrl;
+            return (
+            <div key={bn._id || i} className={`g-hero-slide${isFull ? " g-hero-full" : ""}`} style={{ background: bn.bgColor }}>
               {/* Media — to'liq ko'rinadi, rasmda yengil Ken Burns zoom */}
               {bn.mediaType === "image" && bn.mediaUrl && (
-                <img src={bn.mediaUrl} alt="" className="g-hero-media is-image" draggable="false" />
+                <img src={thumb(bn.mediaUrl, 900)} alt="" className="g-hero-media is-image" draggable="false"
+                  loading={i === 0 ? "eager" : "lazy"} decoding="async"
+                  fetchpriority={i === 0 ? "high" : "auto"}
+                  onError={(e) => imgFallback(e, bn.mediaUrl)} />
               )}
               {bn.mediaType === "video" && bn.mediaUrl && (
                 <video autoPlay muted loop playsInline className="g-hero-media">
                   <source src={bn.mediaUrl} />
                 </video>
               )}
-              {bn.mediaType !== "none" && bn.mediaUrl && <div className="g-hero-overlay" />}
-              <div className="g-hero-accent-line" />
+              {!isFull && bn.mediaType !== "none" && bn.mediaUrl && <div className="g-hero-overlay" />}
+              {!isFull && <div className="g-hero-accent-line" />}
 
+              {!isFull && (
               <div className="g-hero-content">
                 <img src={LOGO_WHITE} alt="Yalpiz" className="g-hero-logo" draggable="false" />
                 <h1 className="g-hero-title">
@@ -363,8 +371,10 @@ function HeroBanner({ banners, t, foods, navigate }) {
                   </button>
                 )}
               </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

@@ -17,10 +17,12 @@ const { redis } = require("./lib/redis");
 const app = express();
 
 // ── CORS: CORS_ORIGINS env bo'lsa faqat shu domenlar; bo'lmasa hammaga (dev) ──
-const corsOrigins = (process.env.CORS_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+// Trailing slash'ga chidamli: origin brauzerda slashsiz keladi, env'da slash bo'lsa ham mos keladi.
+const stripSlash = (s) => s.replace(/\/+$/, "");
+const corsOrigins = (process.env.CORS_ORIGINS || "").split(",").map(s => stripSlash(s.trim())).filter(Boolean);
 if (corsOrigins.length === 0) console.warn("⚠️  CORS_ORIGINS env yo'q — barcha domenlarga ochiq (faqat dev uchun).");
 app.use(cors({
-  origin: corsOrigins.length ? (origin, cb) => cb(null, !origin || corsOrigins.includes(origin)) : true,
+  origin: corsOrigins.length ? (origin, cb) => cb(null, !origin || corsOrigins.includes(stripSlash(origin))) : true,
   credentials: true,
 }));
 
@@ -69,6 +71,7 @@ app.use(require("./routes/auth.routes"));
 app.use(require("./routes/filials.routes"));
 app.use(require("./routes/foods.routes"));
 app.use(require("./routes/orders.routes"));
+app.use(require("./routes/booking.routes"));
 app.use(require("./routes/payments.routes"));
 app.use(require("./routes/webhooks.routes"));
 app.use(require("./routes/banners.routes"));

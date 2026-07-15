@@ -7,7 +7,9 @@ const { getFilial } = require("../services/filials");
 const { calcMilleniumDeliveryPrice } = require("../integrations/millenium");
 const { makePaymePaymentUrl } = require("../integrations/payme");
 const { makeClickPaymentUrl } = require("../integrations/click");
-const { sendPaidOrderTelegram, editStaffOrderMessage } = require("../services/orderMessaging");
+const { editStaffOrderMessage } = require("../services/orderMessaging");
+const { fulfillAcceptedOrder } = require("../services/orderFulfillment");
+const { getConfig: getDeleverConfig } = require("../integrations/delever");
 const { sendTelegram } = require("../integrations/telegram");
 const { ORDER_STATUSES, STATUS_LABELS } = require("../config/constants");
 const { autoCancelUnpaidOrders } = require("../services/orderJobs");
@@ -79,7 +81,7 @@ router.post("/api/orders", async (req, res) => {
       }
     }
     const wantedIds = [...new Set(cartItems.map(i => String(i.foodId)))];
-    const dbFoods = await Food.find({ _id: { $in: wantedIds } }).select("title price isAvailable");
+    const dbFoods = await Food.find({ _id: { $in: wantedIds } }).select("title price isAvailable deleverId source");
     if (dbFoods.length !== wantedIds.length) {
       return res.status(400).json({ message: "Savatdagi ayrim taomlar topilmadi. Savatni yangilang." });
     }
@@ -90,14 +92,27 @@ router.post("/api/orders", async (req, res) => {
     }
     const foodMap = new Map(dbFoods.map(f => [String(f._id), f]));
 
+    // Delever yoqilganda buyurtmadagi barcha taomlar tashqi menyu ID'siga ega bo'lishi shart.
+    // Bu Neon Alisa'ga noto'g'ri/local ID yuborilishining oldini oladi.
+    const deleverConfig = getDeleverConfig();
+    if (deleverConfig.enabled && String(process.env.DELEVER_REQUIRE_EXTERNAL_ITEMS || "true").toLowerCase() !== "false") {
+      const withoutDeleverId = dbFoods.find(f => !f.deleverId);
+      if (withoutDeleverId) {
+        const title = withoutDeleverId.title?.uz || "Tanlangan taom";
+        return res.status(409).json({ message: `${title} Delever menyusi bilan hali sinxronlashmagan. Iltimos, birozdan keyin qayta urinib ko'ring.` });
+      }
+    }
+
     // Miqdor musbat butun son; narx faqat DB'dan olinadi (mijoz narxi e'tiborsiz).
     const serverItems = cartItems.map(it => {
       const f = foodMap.get(String(it.foodId));
       return {
         foodId: String(it.foodId),
-        title: String(it.title || f.title?.uz || "Taom"),
+        deleverProductId: String(f.deleverId || ""),
+        title: String(f.title?.uz || it.title || "Taom"),
         price: Number(f.price) || 0,
         quantity: Math.max(1, Math.floor(Number(it.quantity) || 0)),
+        modifiers: [],
       };
     });
     const serverTotal = serverItems.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -155,10 +170,10 @@ router.post("/api/orders", async (req, res) => {
 
     // NAQD (pickup): to'lov kutilmaydi — buyurtma darrov oshxonaga tushadi
     if (normalizedPaymentType === "cash") {
-      await sendPaidOrderTelegram(order);
+      const fulfillment = await fulfillAcceptedOrder(order);
       return res.status(201).json({
         message: "Buyurtma qabul qilindi! ✅",
-        order,
+        order: fulfillment.order || order,
         paymentUrl: "",
       });
     }

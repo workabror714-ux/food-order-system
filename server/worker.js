@@ -5,6 +5,7 @@ require("dotenv").config();
 const connectDB = require("./db");
 const { tryLock } = require("./lib/redis");
 const { autoCancelUnpaidOrders } = require("./services/orderJobs");
+const { startDeleverJobs } = require("./services/deleverJobs");
 
 const INTERVAL_MS = 5 * 60 * 1000;
 
@@ -18,7 +19,9 @@ const tick = async () => {
 
 (async () => {
   await connectDB();
-  console.log("⚙️  Worker ishga tushdi — fon jarayonlari (har 5 daqiqa)");
+  console.log("⚙️  Worker ishga tushdi — fon jarayonlari");
   await tick();
-  setInterval(tick, INTERVAL_MS);
+  const timer = setInterval(tick, INTERVAL_MS);
+  timer.unref?.();
+  startDeleverJobs();
 })();

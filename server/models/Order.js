@@ -5,9 +5,11 @@ const OrderSchema = new mongoose.Schema({
   customerPhone: { type: String, required: true },
   items: [{
     foodId:   { type: String },
+    deleverProductId: { type: String, default: "" },
     title:    { type: String },
     price:    { type: Number },
     quantity: { type: Number },
+    modifiers: { type: [mongoose.Schema.Types.Mixed], default: [] },
   }],
   totalPrice:  { type: Number },
   address:     { type: String, default: "" },
@@ -65,6 +67,22 @@ const OrderSchema = new mongoose.Schema({
   filialId:   { type: String, default: null },
   filialName: { type: String, default: null },
 
+  // Delever → Neon Alisa integratsiyasi
+  deleverOrderId: { type: String },
+  deleverExternalId: { type: String, default: "" },
+  deleverStatus: { type: String, default: "" },
+  deleverSyncStatus: {
+    type: String,
+    enum: ["not_required", "pending", "syncing", "success", "failed"],
+    default: "pending",
+  },
+  deleverSyncError: { type: String, default: "" },
+  deleverAttempts: { type: Number, default: 0 },
+  deleverLastAttemptAt: { type: Date, default: null },
+  deleverNextRetryAt: { type: Date, default: null },
+  deleverSyncedAt: { type: Date, default: null },
+  deleverRawResponse: { type: mongoose.Schema.Types.Mixed, default: null },
+
   // Millenium Taxi integration
   milleniumOrderId: { type: String, default: null },
   driverName:       { type: String, default: "" },
@@ -80,5 +98,7 @@ OrderSchema.index({ status: 1, createdAt: -1 });           // admin status filtr
 OrderSchema.index({ paymentStatus: 1, status: 1 });        // aktiv buyurtmalar (paid + status)
 OrderSchema.index({ paymeTransactionId: 1 });              // Payme Perform/Cancel/Check
 OrderSchema.index({ milleniumOrderId: 1 });                // Millenium webhook
+OrderSchema.index({ deleverOrderId: 1 }, { unique: true, sparse: true });
+OrderSchema.index({ deleverSyncStatus: 1, deleverNextRetryAt: 1, createdAt: 1 });
 
 module.exports = mongoose.model("Order", OrderSchema);

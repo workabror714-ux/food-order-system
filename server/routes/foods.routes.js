@@ -2,10 +2,22 @@ const router = require("express").Router();
 const { auth } = require("../middleware/auth");
 const Food = require("../models/Food");
 
+const syncedMenuLocked = () => String(process.env.DELEVER_LOCK_SYNCED_MENU || "true").toLowerCase() !== "false";
+const rejectSyncedFoodEdit = async (id, res) => {
+  if (!syncedMenuLocked()) return false;
+  const food = await Food.findById(id).select("source title");
+  if (food?.source !== "delever") return false;
+  res.status(409).json({
+    message: "Bu taom Neon Alisa/Delever menyusidan kelgan. Uni ichki tizimda o'zgartiring — bot avtomatik yangilanadi.",
+  });
+  return true;
+};
+
 router.get("/api/foods", async (req, res) => {
   try {
-    const filter = req.query.category ? { "category.uz": req.query.category } : {};
-    const foods = await Food.find(filter).sort({ createdAt: -1 });
+    const filter = { isDeletedInSource: { $ne: true } };
+    if (req.query.category) filter["category.uz"] = req.query.category;
+    const foods = await Food.find(filter).sort({ sortOrder: 1, createdAt: -1 });
     res.json(foods);
   } catch { res.status(500).json({ message: "Xato" }); }
 });
@@ -38,6 +50,7 @@ router.post("/api/foods", auth, async (req, res) => {
 
 router.put("/api/foods/:id", auth, async (req, res) => {
   try {
+    if (await rejectSyncedFoodEdit(req.params.id, res)) return;
     const { title_uz, title_ru, title_en, price, category_uz, category_ru, category_en, desc_uz, desc_ru, desc_en, imageUrl, isAvailable } = req.body;
     const update = {
       price: parseFloat(String(price).replace(/[^0-9.]/g,'')) || 0,
@@ -55,6 +68,7 @@ router.put("/api/foods/:id", auth, async (req, res) => {
 
 router.patch("/api/foods/:id/availability", auth, async (req, res) => {
   try {
+    if (await rejectSyncedFoodEdit(req.params.id, res)) return;
     const { isAvailable } = req.body;
     const food = await Food.findByIdAndUpdate(
       req.params.id,
@@ -68,6 +82,7 @@ router.patch("/api/foods/:id/availability", auth, async (req, res) => {
 
 router.delete("/api/foods/:id", auth, async (req, res) => {
   try {
+    if (await rejectSyncedFoodEdit(req.params.id, res)) return;
     await Food.findByIdAndDelete(req.params.id);
     res.json({ message: "O'chirildi" });
   } catch { res.status(500).json({ message: "Xato" }); }

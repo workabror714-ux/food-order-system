@@ -76,15 +76,20 @@ app.use(require("./routes/payments.routes"));
 app.use(require("./routes/webhooks.routes"));
 app.use(require("./routes/banners.routes"));
 app.use(require("./routes/customers.routes"));
+app.use(require("./routes/delever.routes"));
 
 // ════ FON JARAYONLARI ════════════════════════════════════════════════════════
 // Ko'p instance bo'lsa: lock orqali faqat BITTA instance sweepni bajaradi (dublikatsiz).
 // Alohida worker ishlatilsa: API'da RUN_JOBS=false qo'ying, `node worker.js` ishga tushiring.
 const { tryLock } = require("./lib/redis");
 if (process.env.RUN_JOBS !== "false") {
-  setInterval(async () => {
+  const autoCancelTimer = setInterval(async () => {
     if (await tryLock("lock:autocancel", 290)) await autoCancelUnpaidOrders();
   }, 5 * 60 * 1000);
+  autoCancelTimer.unref?.();
+
+  const { startDeleverJobs } = require("./services/deleverJobs");
+  startDeleverJobs();
 }
 
 // ─── SERVER ───────────────────────────────────────────────────────────────────

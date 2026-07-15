@@ -2,8 +2,7 @@ const router = require("express").Router();
 const Order = require("../models/Order");
 const { toTiyin, nowMs, paymeError, paymeResult, checkPaymeAuth } = require("../integrations/payme");
 const { checkClickSign, clickOk, clickError } = require("../integrations/click");
-const { dispatchMilleniumOrder } = require("../integrations/millenium");
-const { sendPaidOrderTelegram } = require("../services/orderMessaging");
+const { fulfillAcceptedOrder } = require("../services/orderFulfillment");
 
 router.post("/api/payments/payme", async (req, res) => {
   console.log("PAYME headers auth exists:", !!req.headers.authorization);
@@ -105,8 +104,7 @@ router.post("/api/payments/payme", async (req, res) => {
       await order.save();
 
       // To'lov tasdiqlandi → taxi chaqiramiz va oshxonaga xabar beramiz
-      await dispatchMilleniumOrder(order);
-      await sendPaidOrderTelegram(order);
+      await fulfillAcceptedOrder(order);
 
       return res.json(paymeResult(id, {
         transaction: String(order._id),
@@ -279,8 +277,7 @@ router.post("/api/payments/click/complete", async (req, res) => {
     await order.save();
 
     // To'lov tasdiqlandi → taxi chaqiramiz va oshxonaga xabar beramiz
-    await dispatchMilleniumOrder(order);
-    await sendPaidOrderTelegram(order);
+    await fulfillAcceptedOrder(order);
 
     return res.json(clickOk({
       click_trans_id: body.click_trans_id,

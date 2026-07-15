@@ -32,21 +32,10 @@ router.get("/api/foods", async (req, res) => {
     const mode = getMenuSourceMode();
 
     const filter = {
-      isDeletedInSource: {
-        $ne: true,
-      },
+      isDeletedInSource: { $ne: true },
+      isAvailable: true,
     };
 
-    /*
-     * local:
-     * Eski qo‘lda kiritilgan menyu chiqadi.
-     *
-     * delever:
-     * Faqat Neon Alisa/Delever menyusi chiqadi.
-     *
-     * mixed:
-     * Ikkalasi ham chiqadi.
-     */
     if (mode === "local") {
       filter.$or = [
         { source: "local" },
@@ -60,27 +49,36 @@ router.get("/api/foods", async (req, res) => {
     }
 
     if (req.query.category) {
-      filter["category.uz"] =
-        req.query.category;
+      filter["category.uz"] = req.query.category;
     }
 
     const foods = await Food.find(filter)
+      .select(
+        [
+          "title",
+          "category",
+          "description",
+          "price",
+          "image",
+          "isAvailable",
+          "modifierGroups",
+          "deleverId",
+          "deleverCategoryId",
+          "source",
+          "sortOrder",
+        ].join(" ")
+      )
       .sort({
         sortOrder: 1,
         createdAt: -1,
-      });
+      })
+      .lean();
 
-    res.set(
-      "X-Menu-Source",
-      mode
-    );
+    res.set("X-Menu-Source", mode);
 
     return res.json(foods);
   } catch (error) {
-    console.error(
-      "Foods list xato:",
-      error.message
-    );
+    console.error("Foods list xato:", error.message);
 
     return res.status(500).json({
       message: "Xato",

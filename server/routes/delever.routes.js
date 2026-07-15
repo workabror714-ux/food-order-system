@@ -7,6 +7,8 @@ const {
   getPublicConfig,
   getAccessToken,
   getRestaurants,
+  getMenuComposition,
+  getMenuAvailability,
 } = require("../integrations/delever");
 const { syncDeleverMenu } = require("../services/deleverMenuSync");
 const {
@@ -65,6 +67,72 @@ router.get("/api/admin/delever/restaurants", auth, superAdmin, async (req, res) 
     });
   }
 });
+
+router.get(
+  "/api/admin/delever/menu-preview",
+  auth,
+  superAdmin,
+  async (req, res) => {
+    try {
+      const config = getPublicConfig();
+
+      if (!config.restaurantId) {
+        return res.status(400).json({
+          success: false,
+          message: "DELEVER_RESTAURANT_ID kiritilmagan",
+        });
+      }
+
+      const menu = await getMenuComposition(config.restaurantId);
+
+      return res.json({
+        success: true,
+        restaurantId: config.restaurantId,
+        menu,
+      });
+    } catch (error) {
+      return res.status(error.status || 400).json({
+        success: false,
+        message: error.message,
+        code: error.code || "DELEVER_ERROR",
+        response: error.response || null,
+      });
+    }
+  }
+);
+
+router.get(
+  "/api/admin/delever/availability-preview",
+  auth,
+  superAdmin,
+  async (req, res) => {
+    try {
+      const config = getPublicConfig();
+
+      if (!config.restaurantId) {
+        return res.status(400).json({
+          success: false,
+          message: "DELEVER_RESTAURANT_ID kiritilmagan",
+        });
+      }
+
+      const availability = await getMenuAvailability(config.restaurantId);
+
+      return res.json({
+        success: true,
+        restaurantId: config.restaurantId,
+        availability,
+      });
+    } catch (error) {
+      return res.status(error.status || 400).json({
+        success: false,
+        message: error.message,
+        code: error.code || "DELEVER_ERROR",
+        response: error.response || null,
+      });
+    }
+  }
+);
 
 router.post("/api/admin/delever/sync-menu", auth, superAdmin, async (req, res) => {
   try {

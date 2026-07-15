@@ -14,7 +14,12 @@ const orderIsEligible = (order) => {
 
 const syncOrderToDelever = async (orderOrId, { force = false } = {}) => {
   const config = getConfig();
-  if (!config.enabled) return { skipped: true, reason: "DELEVER_ENABLED=false" };
+  if (!config.orderEnabled) {
+    return {
+      skipped: true,
+      reason: "DELEVER_ORDER_ENABLED=false",
+    };
+  }
 
   const orderId = String(orderOrId?._id || orderOrId || "");
   if (!orderId) throw new Error("Buyurtma ID berilmagan");
@@ -118,7 +123,12 @@ const syncOrderToDelever = async (orderOrId, { force = false } = {}) => {
 
 const retryPendingDeleverOrders = async ({ limit } = {}) => {
   const config = getConfig();
-  if (!config.enabled) return { skipped: true, reason: "DELEVER_ENABLED=false" };
+  if (!config.orderEnabled) {
+    return {
+      skipped: true,
+      reason: "DELEVER_ORDER_ENABLED=false",
+    };
+  };
 
   const now = new Date();
   const max = Math.max(1, Math.min(100, Number(limit) || Number(process.env.DELEVER_RETRY_BATCH_SIZE) || 20));

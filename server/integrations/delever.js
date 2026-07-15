@@ -20,32 +20,123 @@ const normalizePath = (value, fallback) => {
   return path.startsWith("/") ? path : `/${path}`;
 };
 
-const getConfig = () => ({
-  enabled: String(process.env.DELEVER_ENABLED || "false").toLowerCase() === "true",
-  baseUrl: normalizeBaseUrl(process.env.DELEVER_BASE_URL),
-  clientId: String(process.env.DELEVER_CLIENT_ID || "").trim(),
-  clientSecret: String(process.env.DELEVER_CLIENT_SECRET || "").trim(),
-  restaurantId: String(process.env.DELEVER_RESTAURANT_ID || "").trim(),
-  tokenPath: normalizePath(process.env.DELEVER_TOKEN_PATH, "/v1/security/oauth/token"),
-  restaurantsPath: normalizePath(process.env.DELEVER_RESTAURANTS_PATH, "/v1/restaurants"),
-  menuCompositionPath: normalizePath(process.env.DELEVER_MENU_COMPOSITION_PATH, "/v1/menu/{restaurantId}/composition"),
-  menuAvailabilityPath: normalizePath(process.env.DELEVER_MENU_AVAILABILITY_PATH, "/v1/menu/{restaurantId}/availability"),
-  orderPath: normalizePath(process.env.DELEVER_ORDER_PATH, "/v1/order"),
-  orderStatusPath: normalizePath(process.env.DELEVER_ORDER_STATUS_PATH, "/v1/order/{orderId}/status"),
-  orderCancelPath: normalizePath(process.env.DELEVER_ORDER_CANCEL_PATH, "/v1/order/{orderId}"),
-  grantType: String(process.env.DELEVER_GRANT_TYPE || "").trim(),
-  scope: String(process.env.DELEVER_SCOPE || "").trim(),
-  tokenAuthMode: String(process.env.DELEVER_TOKEN_AUTH_MODE || "auto").trim().toLowerCase(),
-  authScheme: String(process.env.DELEVER_AUTH_SCHEME || "Bearer").trim(),
-  platform: String(process.env.DELEVER_PLATFORM || "BOT").trim(),
-  timeoutMs: Math.max(1000, Number(process.env.DELEVER_TIMEOUT_MS) || 15000),
-});
+const envBoolean = (value, fallback = false) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  return normalized === "true";
+};
+
+const getConfig = () => {
+  const enabled = envBoolean(
+    process.env.DELEVER_ENABLED,
+    false
+  );
+
+  return {
+    enabled,
+
+    // Menyu ishlashi mumkin, lekin buyurtmalar hali yuborilmaydi.
+    orderEnabled: envBoolean(
+      process.env.DELEVER_ORDER_ENABLED,
+      enabled
+    ),
+
+    baseUrl: normalizeBaseUrl(
+      process.env.DELEVER_BASE_URL
+    ),
+
+    clientId: String(
+      process.env.DELEVER_CLIENT_ID || ""
+    ).trim(),
+
+    clientSecret: String(
+      process.env.DELEVER_CLIENT_SECRET || ""
+    ).trim(),
+
+    restaurantId: String(
+      process.env.DELEVER_RESTAURANT_ID || ""
+    ).trim(),
+
+    tokenPath: normalizePath(
+      process.env.DELEVER_TOKEN_PATH,
+      "/v1/security/oauth/token"
+    ),
+
+    restaurantsPath: normalizePath(
+      process.env.DELEVER_RESTAURANTS_PATH,
+      "/v1/restaurants"
+    ),
+
+    menuCompositionPath: normalizePath(
+      process.env.DELEVER_MENU_COMPOSITION_PATH,
+      "/v1/menu/{restaurantId}/composition"
+    ),
+
+    menuAvailabilityPath: normalizePath(
+      process.env.DELEVER_MENU_AVAILABILITY_PATH,
+      "/v1/menu/{restaurantId}/availability"
+    ),
+
+    orderPath: normalizePath(
+      process.env.DELEVER_ORDER_PATH,
+      "/v1/order"
+    ),
+
+    orderStatusPath: normalizePath(
+      process.env.DELEVER_ORDER_STATUS_PATH,
+      "/v1/order/{orderId}/status"
+    ),
+
+    orderCancelPath: normalizePath(
+      process.env.DELEVER_ORDER_CANCEL_PATH,
+      "/v1/order/{orderId}"
+    ),
+
+    grantType: String(
+      process.env.DELEVER_GRANT_TYPE || ""
+    ).trim(),
+
+    scope: String(
+      process.env.DELEVER_SCOPE || ""
+    ).trim(),
+
+    tokenAuthMode: String(
+      process.env.DELEVER_TOKEN_AUTH_MODE || "auto"
+    ).trim().toLowerCase(),
+
+    authScheme: String(
+      process.env.DELEVER_AUTH_SCHEME || "Bearer"
+    ).trim(),
+
+    platform: String(
+      process.env.DELEVER_PLATFORM || "BOT"
+    ).trim(),
+
+    timeoutMs: Math.max(
+      1000,
+      Number(process.env.DELEVER_TIMEOUT_MS) || 15000
+    ),
+  };
+};
 
 const getPublicConfig = () => {
   const c = getConfig();
+
   return {
     enabled: c.enabled,
-    configured: Boolean(c.baseUrl && c.clientId && c.clientSecret && c.restaurantId),
+    orderEnabled: c.orderEnabled,
+
+    configured: Boolean(
+      c.baseUrl &&
+      c.clientId &&
+      c.clientSecret &&
+      c.restaurantId
+    ),
+
     baseUrl: c.baseUrl,
     restaurantId: c.restaurantId,
     clientIdConfigured: Boolean(c.clientId),

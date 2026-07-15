@@ -219,12 +219,37 @@ const availabilityCollections = (payload) => ({
 });
 
 const availabilityValue = (entry) => {
-  const bool = firstDefined(entry?.isAvailable, entry?.available, entry?.enabled, entry?.active);
+  const bool = firstDefined(
+    entry?.isAvailable,
+    entry?.available,
+    entry?.enabled,
+    entry?.active
+  );
+
   if (typeof bool === "boolean") return bool;
-  if (entry?.isStop === true || entry?.stopped === true || entry?.disabled === true) return false;
-  const stock = numeric(firstDefined(entry?.stock, entry?.balance, entry?.quantity, entry?.remaining));
+
+  if (
+    entry?.isStop === true ||
+    entry?.stopped === true ||
+    entry?.disabled === true
+  ) {
+    return false;
+  }
+
+  const stock = numeric(
+    firstDefined(
+      entry?.stock,
+      entry?.balance,
+      entry?.quantity,
+      entry?.remaining
+    )
+  );
+
   if (stock !== null) return stock > 0;
-  return true;
+
+  // Delever availability endpointidagi items ro‘yxati stop-list hisoblanadi.
+  // Faqat itemId kelgan bo‘lsa ham taom mavjud emas deb olinadi.
+  return false;
 };
 
 const availabilityId = (entry, type) => String(firstDefined(

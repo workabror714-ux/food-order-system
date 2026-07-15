@@ -4,15 +4,25 @@ const {
   clearTokenCache,
   getAccessToken,
   getMenuComposition,
+  getConfig,
 } = require("../integrations/delever");
 const { normalizeComposition, availabilityValue } = require("../lib/deleverMenuMapper");
 const { buildDeleverOrderPayload, extractDeleverOrderId, mapDeleverStatus } = require("../lib/deleverOrderMapper");
 
 const ENV_KEYS = [
-  "DELEVER_BASE_URL", "DELEVER_CLIENT_ID", "DELEVER_CLIENT_SECRET",
-  "DELEVER_RESTAURANT_ID", "DELEVER_TOKEN_AUTH_MODE", "DELEVER_AUTH_SCHEME",
-  "DELEVER_GRANT_TYPE", "DELEVER_SCOPE", "DELEVER_INCLUDE_EXTERNAL_ID",
-  "DELEVER_REQUIRE_EXTERNAL_ITEMS", "DELEVER_PLATFORM",
+  "DELEVER_ENABLED",
+  "DELEVER_ORDER_ENABLED",
+  "DELEVER_BASE_URL",
+  "DELEVER_CLIENT_ID",
+  "DELEVER_CLIENT_SECRET",
+  "DELEVER_RESTAURANT_ID",
+  "DELEVER_TOKEN_AUTH_MODE",
+  "DELEVER_AUTH_SCHEME",
+  "DELEVER_GRANT_TYPE",
+  "DELEVER_SCOPE",
+  "DELEVER_INCLUDE_EXTERNAL_ID",
+  "DELEVER_REQUIRE_EXTERNAL_ITEMS",
+  "DELEVER_PLATFORM",
 ];
 const originalEnv = Object.fromEntries(ENV_KEYS.map(key => [key, process.env[key]]));
 
@@ -97,11 +107,49 @@ test("Delever menyu javobi Food formatiga normallashtiriladi", () => {
   assert.strictEqual(result.products[0].modifierGroups.length, 1);
 });
 
-test("availability stock=0 bo'lsa taom mavjud emas", () => {
-  assert.strictEqual(availabilityValue({ stock: 0 }), false);
-  assert.strictEqual(availabilityValue({ stock: 4 }), true);
-  assert.strictEqual(availabilityValue({ isAvailable: false }), false);
+test("Delever stop-list qiymati to'g'ri aniqlanadi", () => {
+  assert.strictEqual(
+    availabilityValue({ stock: 0 }),
+    false
+  );
+
+  assert.strictEqual(
+    availabilityValue({ stock: 4 }),
+    true
+  );
+
+  assert.strictEqual(
+    availabilityValue({ isAvailable: false }),
+    false
+  );
+
+  assert.strictEqual(
+    availabilityValue({
+      itemId: "stop-list-item",
+    }),
+    false
+  );
 });
+
+test(
+  "Delever menyu yoqilib, buyurtma yuborish alohida o'chiriladi",
+  () => {
+    process.env.DELEVER_ENABLED = "true";
+    process.env.DELEVER_ORDER_ENABLED = "false";
+
+    const config = getConfig();
+
+    assert.strictEqual(
+      config.enabled,
+      true
+    );
+
+    assert.strictEqual(
+      config.orderEnabled,
+      false
+    );
+  }
+);
 
 test("Bot order Delever payloadiga xavfsiz map qilinadi", () => {
   configure();

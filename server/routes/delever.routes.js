@@ -69,6 +69,94 @@ router.get("/api/admin/delever/restaurants", auth, superAdmin, async (req, res) 
 });
 
 router.get(
+  "/api/admin/delever/synced-foods",
+  auth,
+  superAdmin,
+  async (req, res) => {
+    try {
+      const config = getPublicConfig();
+
+      const limit = Math.min(
+        100,
+        Math.max(
+          1,
+          Number(req.query.limit) || 20
+        )
+      );
+
+      const filter = {
+        source: "delever",
+        deleverRestaurantId:
+          config.restaurantId,
+
+        isDeletedInSource: {
+          $ne: true,
+        },
+      };
+
+      const [
+        total,
+        available,
+        unavailable,
+        foods,
+      ] = await Promise.all([
+        Food.countDocuments(filter),
+
+        Food.countDocuments({
+          ...filter,
+          isAvailable: true,
+        }),
+
+        Food.countDocuments({
+          ...filter,
+          isAvailable: false,
+        }),
+
+        Food.find(filter)
+          .select(
+            [
+              "title",
+              "category",
+              "price",
+              "image",
+              "isAvailable",
+              "deleverId",
+              "deleverCategoryId",
+              "sortOrder",
+            ].join(" ")
+          )
+          .sort({
+            sortOrder: 1,
+            createdAt: -1,
+          })
+          .limit(limit)
+          .lean(),
+      ]);
+
+      return res.json({
+        success: true,
+
+        restaurantId:
+          config.restaurantId,
+
+        counts: {
+          total,
+          available,
+          unavailable,
+        },
+
+        foods,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+
+router.get(
   "/api/admin/delever/menu-preview",
   auth,
   superAdmin,

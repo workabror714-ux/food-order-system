@@ -95,7 +95,12 @@ router.post("/api/orders", async (req, res) => {
     // Delever yoqilganda buyurtmadagi barcha taomlar tashqi menyu ID'siga ega bo'lishi shart.
     // Bu Neon Alisa'ga noto'g'ri/local ID yuborilishining oldini oladi.
     const deleverConfig = getDeleverConfig();
-    if (deleverConfig.enabled && String(process.env.DELEVER_REQUIRE_EXTERNAL_ITEMS || "true").toLowerCase() !== "false") {
+    if (
+      deleverConfig.orderEnabled &&
+      String(
+        process.env.DELEVER_REQUIRE_EXTERNAL_ITEMS || "true"
+      ).toLowerCase() !== "false"
+    ) {
       const withoutDeleverId = dbFoods.find(f => !f.deleverId);
       if (withoutDeleverId) {
         const title = withoutDeleverId.title?.uz || "Tanlangan taom";
@@ -156,6 +161,9 @@ router.post("/api/orders", async (req, res) => {
       deliveryPriceRaw: deliveryCalc?.raw || null,
       paymentAmount,
       status: "new"
+      deleverSyncStatus: deleverConfig.orderEnabled
+        ? "pending"
+        : "not_required",
     }).save();
 
     if (normalizedPaymentType === "payme") {

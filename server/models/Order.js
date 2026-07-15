@@ -73,8 +73,14 @@ const OrderSchema = new mongoose.Schema({
   deleverStatus: { type: String, default: "" },
   deleverSyncStatus: {
     type: String,
-    enum: ["not_required", "pending", "syncing", "success", "failed"],
-    default: "pending",
+    enum: [
+      "not_required",
+      "pending",
+      "syncing",
+      "success",
+      "failed"
+    ],
+    default: "not_required",
   },
   deleverSyncError: { type: String, default: "" },
   deleverAttempts: { type: Number, default: 0 },

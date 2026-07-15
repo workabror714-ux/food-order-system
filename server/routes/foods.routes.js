@@ -2,6 +2,20 @@ const router = require("express").Router();
 const { auth } = require("../middleware/auth");
 const Food = require("../models/Food");
 
+const getMenuSourceMode = () => {
+  const mode = String(
+    process.env.MENU_SOURCE_MODE || "local"
+  ).trim().toLowerCase();
+
+  if (
+    ["local", "delever", "mixed"].includes(mode)
+  ) {
+    return mode;
+  }
+
+  return "local";
+};
+
 const syncedMenuLocked = () => String(process.env.DELEVER_LOCK_SYNCED_MENU || "true").toLowerCase() !== "false";
 const rejectSyncedFoodEdit = async (id, res) => {
   if (!syncedMenuLocked()) return false;
@@ -15,11 +29,63 @@ const rejectSyncedFoodEdit = async (id, res) => {
 
 router.get("/api/foods", async (req, res) => {
   try {
-    const filter = { isDeletedInSource: { $ne: true } };
-    if (req.query.category) filter["category.uz"] = req.query.category;
-    const foods = await Food.find(filter).sort({ sortOrder: 1, createdAt: -1 });
-    res.json(foods);
-  } catch { res.status(500).json({ message: "Xato" }); }
+    const mode = getMenuSourceMode();
+
+    const filter = {
+      isDeletedInSource: {
+        $ne: true,
+      },
+    };
+
+    /*
+     * local:
+     * Eski qo‘lda kiritilgan menyu chiqadi.
+     *
+     * delever:
+     * Faqat Neon Alisa/Delever menyusi chiqadi.
+     *
+     * mixed:
+     * Ikkalasi ham chiqadi.
+     */
+    if (mode === "local") {
+      filter.$or = [
+        { source: "local" },
+        { source: { $exists: false } },
+        { source: null },
+      ];
+    }
+
+    if (mode === "delever") {
+      filter.source = "delever";
+    }
+
+    if (req.query.category) {
+      filter["category.uz"] =
+        req.query.category;
+    }
+
+    const foods = await Food.find(filter)
+      .sort({
+        sortOrder: 1,
+        createdAt: -1,
+      });
+
+    res.set(
+      "X-Menu-Source",
+      mode
+    );
+
+    return res.json(foods);
+  } catch (error) {
+    console.error(
+      "Foods list xato:",
+      error.message
+    );
+
+    return res.status(500).json({
+      message: "Xato",
+    });
+  }
 });
 
 router.get("/api/foods/:id", async (req, res) => {

@@ -152,20 +152,26 @@ router.post("/api/orders", async (req, res) => {
       orderType: normalizedOrderType,
       paymentType: normalizedPaymentType,
       paymentProvider: normalizedPaymentType,
-      paymentStatus: normalizedPaymentType === "cash" ? "unpaid" : "pending",
+      paymentStatus:
+        normalizedPaymentType === "cash"
+          ? "unpaid"
+          : "pending",
       filialId: filialId || null,
       filialName: filialName || null,
       deliveryPrice: deliveryCalc?.price || 0,
       deliveryPriceSource: deliveryCalc?.source || "",
-      deliveryPriceCalculatedAt: deliveryCalc ? new Date() : null,
+      deliveryPriceCalculatedAt: deliveryCalc
+        ? new Date()
+        : null,
       deliveryPriceRaw: deliveryCalc?.raw || null,
       paymentAmount,
-      status: "new"
+      status: "new",
+    
       deleverSyncStatus: deleverConfig.orderEnabled
         ? "pending"
         : "not_required",
     }).save();
-
+    
     if (normalizedPaymentType === "payme") {
       order.paymentUrl = makePaymePaymentUrl(order);
       await order.save();

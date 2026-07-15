@@ -393,8 +393,7 @@ const syncDeleverMenu = async ({
       stoppedProductsUpdated,
       availabilityUpdated,
 
-      modifierAvailabilityReceived:
-        modifierCount,
+      modifierAvailabilityReceived:modifierCount,
     };
 
     await setState(id, {

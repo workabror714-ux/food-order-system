@@ -596,4 +596,128 @@ router.post("/api/admin/delever/orders/:id/refresh-status", auth, superAdmin, as
   }
 });
 
+router.patch(
+  "/api/admin/delever/foods/:id/translations",
+  auth,
+  superAdmin,
+  async (req, res) => {
+    try {
+      const config = getPublicConfig();
+
+      const {
+        title,
+        category,
+        description,
+      } = req.body || {};
+
+      const update = {};
+
+      const addTranslation = (
+        field,
+        value
+      ) => {
+        if (
+          value &&
+          typeof value.uz === "string"
+        ) {
+          update[`${field}.uz`] =
+            value.uz.trim();
+        }
+
+        if (
+          value &&
+          typeof value.en === "string"
+        ) {
+          update[`${field}.en`] =
+            value.en.trim();
+        }
+      };
+
+      addTranslation("title", title);
+
+      addTranslation(
+        "category",
+        category
+      );
+
+      addTranslation(
+        "description",
+        description
+      );
+
+      if (!Object.keys(update).length) {
+        return res.status(400).json({
+          success: false,
+
+          message:
+            "Hech qanday tarjima yuborilmadi.",
+        });
+      }
+
+      update.translationUpdatedAt =
+        new Date();
+
+      const food =
+        await Food.findOneAndUpdate(
+          {
+            _id: req.params.id,
+
+            source: "delever",
+
+            deleverRestaurantId:
+              config.restaurantId,
+
+            isDeletedInSource: {
+              $ne: true,
+            },
+          },
+
+          {
+            $set: update,
+          },
+
+          {
+            new: true,
+          }
+        ).select(
+          [
+            "title",
+            "category",
+            "description",
+            "price",
+            "deleverBasePrice",
+            "packagingFee",
+            "image",
+            "isAvailable",
+            "deleverId",
+            "translationUpdatedAt",
+          ].join(" ")
+        );
+
+      if (!food) {
+        return res.status(404).json({
+          success: false,
+
+          message:
+            "Delever taomi topilmadi.",
+        });
+      }
+
+      return res.json({
+        success: true,
+
+        message:
+          "Tarjimalar saqlandi.",
+
+        food,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+
 module.exports = router;

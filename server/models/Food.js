@@ -7,7 +7,25 @@ const FoodSchema = new mongoose.Schema({
     ru: { type: String, default: "" },
     en: { type: String, default: "" },
   },
-  price: { type: Number, required: true },
+  // Mijozga ko‘rinadigan yakuniy narx:
+  // Delever asl narxi + idish puli
+  price: {
+    type: Number,
+    required: true,
+  },
+
+  // Delever/Neon Alisa’dan kelgan asl narx
+  deleverBasePrice: {
+    type: Number,
+    default: 0,
+  },
+
+  // Har bir dona taom uchun idish/qadoq puli
+  packagingFee: {
+    type: Number,
+    default: 0,
+  },
+
   category: {
     uz: { type: String, required: true },
     ru: { type: String, default: "" },
@@ -39,6 +57,11 @@ const FoodSchema = new mongoose.Schema({
   isDeletedInSource: { type: Boolean, default: false },
   deleverUpdatedAt: { type: Date, default: null },
   lastSyncedAt: { type: Date, default: null },
+  // Tarjima oxirgi marta qo‘lda o‘zgartirilgan vaqt
+  translationUpdatedAt: {
+    type: Date,
+    default: null,
+  },
   deleverRaw: { type: mongoose.Schema.Types.Mixed, default: null },
 }, { timestamps: true });
 

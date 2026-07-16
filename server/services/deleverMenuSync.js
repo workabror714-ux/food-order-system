@@ -14,6 +14,84 @@ const {
   availabilityId,
 } = require("../lib/deleverMenuMapper");
 
+const cleanText = (value) =>
+  String(value || "").trim();
+
+/*
+ * Oldingi uz/en qiymati ruscha qiymat bilan bir xil bo‘lsa,
+ * u hali qo‘lda tarjima qilinmagan deb hisoblanadi.
+ *
+ * Qo‘lda o‘zgartirilgan tarjima esa sync paytida saqlanadi.
+ */
+const preserveTranslation = ({
+  currentValue,
+  currentRussian,
+  incomingValue,
+}) => {
+  const current = cleanText(currentValue);
+  const oldRussian = cleanText(currentRussian);
+  const incoming = cleanText(incomingValue);
+
+  if (!current) {
+    return incoming;
+  }
+
+  if (oldRussian && current === oldRussian) {
+    return incoming;
+  }
+
+  return current;
+};
+
+const mergeLocalizedText = (
+  existingValue,
+  incomingValue
+) => {
+  const current = existingValue || {};
+  const incoming = incomingValue || {};
+
+  const incomingRussian =
+    cleanText(incoming.ru) ||
+    cleanText(incoming.uz) ||
+    cleanText(incoming.en);
+
+  const incomingUzbek =
+    cleanText(incoming.uz) ||
+    incomingRussian;
+
+  const incomingEnglish =
+    cleanText(incoming.en) ||
+    incomingRussian;
+
+  return {
+    ru: incomingRussian,
+
+    uz: preserveTranslation({
+      currentValue: current.uz,
+      currentRussian: current.ru,
+      incomingValue: incomingUzbek,
+    }),
+
+    en: preserveTranslation({
+      currentValue: current.en,
+      currentRussian: current.ru,
+      incomingValue: incomingEnglish,
+    }),
+  };
+};
+
+const getDeleverItemMarkup = () => {
+  const value = Number(
+    process.env.DELEVER_ITEM_MARKUP ?? 5000
+  );
+
+  if (!Number.isFinite(value) || value < 0) {
+    return 5000;
+  }
+
+  return Math.round(value);
+};
+
 const setState = async (restaurantId, update) =>
   IntegrationState.findOneAndUpdate(
     {
@@ -124,49 +202,156 @@ const syncDeleverMenu = async ({
 
       const now = new Date();
 
-      const operations = normalized.products.map((product) => {
-        const {
-          isAvailable,
-          ...productFields
-        } = product;
-
-        const setFields = {
-          ...productFields,
-          source: "delever",
-          isDeletedInSource: false,
-          lastSyncedAt: now,
-        };
-
-        /*
-         * Composition ichida isAvailable aniq boolean
-         * bo‘lib kelsagina saqlanadi.
-         *
-         * Aks holda stop-list qiymatini composition
-         * bosib yubormaydi.
-         */
-        if (typeof isAvailable === "boolean") {
-          setFields.isAvailable = isAvailable;
-        }
-
-        return {
-          updateOne: {
-            filter: {
-              deleverId: product.deleverId,
-              deleverRestaurantId: id,
-            },
-            update: {
-              $set: setFields,
-              $setOnInsert: {
-                isAvailable:
-                  typeof isAvailable === "boolean"
-                    ? isAvailable
-                    : true,
+      /*
+       * Har bir dona taom uchun qo‘shiladigan idish puli.
+       */
+      const itemMarkup =
+        getDeleverItemMarkup();
+      
+      /*
+       * Oldin bazada mavjud bo‘lgan tarjimalarni olamiz.
+       *
+       * Shu orqali Delever sync o‘zbekcha va inglizcha
+       * tarjimalarni bosib yubormaydi.
+       */
+      const incomingDeleverIds =
+        normalized.products.map(
+          (product) => product.deleverId
+        );
+      
+      const existingFoods = await Food.find({
+        source: "delever",
+      
+        deleverRestaurantId: id,
+      
+        deleverId: {
+          $in: incomingDeleverIds,
+        },
+      })
+        .select(
+          [
+            "deleverId",
+            "title",
+            "category",
+            "description",
+          ].join(" ")
+        )
+        .lean();
+      
+      const existingFoodMap = new Map(
+        existingFoods.map((food) => [
+          String(food.deleverId),
+          food,
+        ])
+      );
+      
+      const operations =
+        normalized.products.map((product) => {
+          const existingFood =
+            existingFoodMap.get(
+              String(product.deleverId)
+            );
+      
+          const {
+            isAvailable,
+            price: rawDeleverPrice,
+            ...productFields
+          } = product;
+      
+          /*
+           * Bu har doim Delever’dan kelgan asl narx.
+           *
+           * MongoDBdagi eski price qiymatiga 5000
+           * qo‘shilmaydi. Shuning uchun narx qayta-qayta
+           * oshib ketmaydi.
+           */
+          const deleverBasePrice = Math.max(
+            0,
+            Number(rawDeleverPrice) || 0
+          );
+      
+          const finalPrice =
+            deleverBasePrice + itemMarkup;
+      
+          const setFields = {
+            ...productFields,
+      
+            /*
+             * Ruscha matn Delever’dan yangilanadi.
+             *
+             * Qo‘lda kiritilgan uz/en tarjimalar
+             * saqlab qolinadi.
+             */
+            title: mergeLocalizedText(
+              existingFood?.title,
+              product.title
+            ),
+      
+            category: mergeLocalizedText(
+              existingFood?.category,
+              product.category
+            ),
+      
+            description: mergeLocalizedText(
+              existingFood?.description,
+              product.description
+            ),
+      
+            /*
+             * Narxlar:
+             * deleverBasePrice — asl narx
+             * packagingFee — idish puli
+             * price — mijoz ko‘radigan yakuniy narx
+             */
+            deleverBasePrice,
+            packagingFee: itemMarkup,
+            price: finalPrice,
+      
+            source: "delever",
+      
+            isDeletedInSource: false,
+      
+            lastSyncedAt: now,
+          };
+      
+          /*
+           * Composition ichida isAvailable aniq boolean
+           * bo‘lib kelsagina saqlanadi.
+           *
+           * Aks holda stop-list qiymatini bosmaydi.
+           */
+          if (
+            typeof isAvailable === "boolean"
+          ) {
+            setFields.isAvailable =
+              isAvailable;
+          }
+      
+          return {
+            updateOne: {
+              filter: {
+                deleverId:
+                  product.deleverId,
+      
+                deleverRestaurantId: id,
               },
+      
+              update: {
+                $set: setFields,
+      
+                $setOnInsert: {
+                  isAvailable:
+                    typeof isAvailable ===
+                    "boolean"
+                      ? isAvailable
+                      : true,
+                },
+              },
+      
+              upsert: true,
             },
-            upsert: true,
-          },
-        };
-      });
+          };
+        });
 
       const result = await Food.bulkWrite(
         operations,
@@ -374,6 +559,9 @@ const syncDeleverMenu = async ({
     const summary = {
       restaurantId: id,
       compositionChanged,
+
+      itemMarkup:
+        getDeleverItemMarkup(),
 
       productsReceived:
         normalized.products.length,

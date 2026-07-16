@@ -6,7 +6,7 @@ import { thumb } from "../img";
 
 // Taomlar tabi — forma, rasm yuklash, kategoriya, ro'yxat, modal.
 // foods/categories shell'da (Banner bilan bo'lishiladi) → prop orqali keladi.
-export default function FoodsTab({ foods, setFoods, categories, setCategories, refetch }) {
+export default function FoodsTab({ foods, setFoods, categories, setCategories, refetch, canSyncDelever = false }) {
   const [activeLang, setActiveLang] = useState("uz");
   const [titles, setTitles] = useState({ uz: "", ru: "", en: "" });
   const [descs, setDescs] = useState({ uz: "", ru: "", en: "" });
@@ -23,6 +23,48 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
   const [editId, setEditId] = useState(null);
   const [foodLoading, setFoodLoading] = useState(false);
   const [selectedFood, setSelectedFood] = useState(null);
+  const [syncingDelever, setSyncingDelever] = useState(false);
+  const [deleverSyncNotice, setDeleverSyncNotice] = useState(null);
+
+  const handleDeleverSync = async () => {
+    if (syncingDelever) return;
+
+    const confirmed = window.confirm(
+      "Delever menyusidagi nom, tarjima, kategoriya, rasm, narx va stop-list yangilanishlarini Yalpiz menyusiga sinxronlaysizmi?"
+    );
+
+    if (!confirmed) return;
+
+    setSyncingDelever(true);
+    setDeleverSyncNotice(null);
+
+    try {
+      const data = await api.post(
+        "/api/admin/delever/sync-menu",
+        { force: true },
+        true
+      );
+
+      const result = data?.result || {};
+
+      await refetch();
+
+      setDeleverSyncNotice({
+        type: "success",
+        text:
+          `Sinxronlash tugadi: ${result.productsReceived || 0} ta item olindi, ` +
+          `${result.modified || 0} ta yangilandi, ${result.upserted || 0} ta yangi qo'shildi. ` +
+          `${result.productsWithoutImage || 0} ta rasmsiz item mijoz menyusida yashirildi.`,
+      });
+    } catch (error) {
+      setDeleverSyncNotice({
+        type: "error",
+        text: error.message || "Delever menyusini sinxronlashda xato yuz berdi.",
+      });
+    } finally {
+      setSyncingDelever(false);
+    }
+  };
 
   const resetForm = () => {
     setTitles({ uz: "", ru: "", en: "" });
@@ -122,6 +164,42 @@ export default function FoodsTab({ foods, setFoods, categories, setCategories, r
 
   return (
     <>
+      {canSyncDelever && (
+        <div className="admin-section delever-sync-card">
+          <div className="delever-sync-copy">
+            <div className="delever-sync-icon">
+              <AppIcon name="refresh" size={22} />
+            </div>
+            <div>
+              <h2 className="delever-sync-title">Delever menyusini yangilash</h2>
+              <p className="delever-sync-description">
+                Deleverdagi taom nomi, tarjima, kategoriya, tavsif, rasm, narx va stop-listdagi barcha o'zgarishlarni Yalpiz menyusiga olib keladi. Rasmi yo'q itemlar mijozlarga ko'rinmaydi.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="delever-sync-btn"
+            onClick={handleDeleverSync}
+            disabled={syncingDelever}
+          >
+            <AppIcon name="refresh" size={17} className={syncingDelever ? "spin-icon" : ""} />
+            {syncingDelever ? "Sinxronlanmoqda..." : "Delever bilan sinxronlash"}
+          </button>
+
+          {deleverSyncNotice && (
+            <div className={`delever-sync-notice ${deleverSyncNotice.type}`}>
+              <AppIcon
+                name={deleverSyncNotice.type === "success" ? "checkCircle" : "warning"}
+                size={17}
+              />
+              <span>{deleverSyncNotice.text}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="admin-section">
         <h2 className="section-title">{editId ? <><AppIcon name="edit" size={17} /> Taomni tahrirlash</> : <><AppIcon name="plus" size={17} /> Yangi taom qo'shish</>}</h2>
         <form onSubmit={handleFoodSubmit} className="food-form">

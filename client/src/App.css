@@ -1092,3 +1092,122 @@ svg.lucide { vertical-align: middle; flex-shrink: 0; }
   font-size: 0.8rem; line-height: 1.5;
 }
 .banner-media-hint svg { color: var(--g); flex-shrink: 0; margin-top: 1px; }
+
+
+/* ─── DELEVER MENU SYNC ───────────────────────────────────── */
+.delever-sync-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, #f0f8f3 0%, #ffffff 72%);
+  border-color: rgba(26, 92, 48, 0.18);
+  border-top-color: var(--g);
+}
+
+.delever-sync-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.delever-sync-icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: var(--g);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(26, 92, 48, 0.22);
+}
+
+.delever-sync-title {
+  margin: 0 0 4px;
+  color: var(--g4);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.delever-sync-description {
+  margin: 0;
+  max-width: 720px;
+  color: var(--gray);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.delever-sync-btn {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 11px;
+  padding: 10px 16px;
+  background: var(--g);
+  color: #fff;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 13px rgba(26, 92, 48, 0.24);
+  transition: transform 0.18s, background 0.18s, opacity 0.18s;
+}
+
+.delever-sync-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: var(--g2);
+}
+
+.delever-sync-btn:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.delever-sync-notice {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 11px;
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.delever-sync-notice.success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.delever-sync-notice.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.spin-icon {
+  animation: delever-spin 0.85s linear infinite;
+}
+
+@keyframes delever-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 720px) {
+  .delever-sync-card {
+    grid-template-columns: 1fr;
+  }
+
+  .delever-sync-btn {
+    width: 100%;
+  }
+}

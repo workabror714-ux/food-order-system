@@ -69,7 +69,7 @@ export default function Admin() {
 
       <div className="admin-content">
         {tab === "foods" && (
-          <FoodsTab foods={foods} setFoods={setFoods} categories={categories} setCategories={setCategories} refetch={fetchFoods} />
+          <FoodsTab foods={foods} setFoods={setFoods} categories={categories} setCategories={setCategories} refetch={fetchFoods} canSyncDelever={savedUser.role === "superadmin"} />
         )}
         {tab === "orders" && <OrdersTab onNewCount={setNewOrderCount} />}
         {tab === "banner" && <BannerTab categories={categories} savedUser={savedUser} />}

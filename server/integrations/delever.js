@@ -1,378 +1,981 @@
 // Delever API integratsiyasi.
-// Muhim: API host va autentifikatsiya formati env orqali boshqariladi,
-// chunki Delever muhiti/akkauntiga qarab qiymatlar farq qilishi mumkin.
+// API host va autentifikatsiya env orqali boshqariladi.
 const fetch = require("../lib/fetch");
 
 class DeleverError extends Error {
-  constructor(message, { status = 0, code = "DELEVER_ERROR", response = null } = {}) {
+  constructor(
+    message,
+    {
+      status = 0,
+      code =
+        "DELEVER_ERROR",
+      response = null,
+    } = {}
+  ) {
     super(message);
-    this.name = "DeleverError";
-    this.status = status;
-    this.code = code;
-    this.response = response;
+
+    this.name =
+      "DeleverError";
+
+    this.status =
+      status;
+
+    this.code =
+      code;
+
+    this.response =
+      response;
   }
 }
 
-const normalizeBaseUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
-const normalizePath = (value, fallback) => {
-  const path = String(value || fallback || "").trim();
-  if (!path) return "";
-  return path.startsWith("/") ? path : `/${path}`;
+const normalizeBaseUrl = (
+  value
+) =>
+  String(value || "")
+    .trim()
+    .replace(/\/+$/, "");
+
+const normalizePath = (
+  value,
+  fallback
+) => {
+  const path =
+    String(
+      value ||
+        fallback ||
+        ""
+    ).trim();
+
+  if (!path) {
+    return "";
+  }
+
+  return path.startsWith("/")
+    ? path
+    : `/${path}`;
 };
 
-const envBoolean = (value, fallback = false) => {
-  const normalized = String(value ?? "").trim().toLowerCase();
+const envBoolean = (
+  value,
+  fallback = false
+) => {
+  const normalized =
+    String(value ?? "")
+      .trim()
+      .toLowerCase();
 
   if (!normalized) {
     return fallback;
   }
 
-  return normalized === "true";
+  return (
+    normalized === "true"
+  );
 };
 
 const getConfig = () => {
-  const enabled = envBoolean(
-    process.env.DELEVER_ENABLED,
-    false
-  );
+  const enabled =
+    envBoolean(
+      process.env
+        .DELEVER_ENABLED,
+      false
+    );
 
   return {
     enabled,
 
-    // Menyu ishlashi mumkin, lekin buyurtmalar hali yuborilmaydi.
-    orderEnabled: envBoolean(
-      process.env.DELEVER_ORDER_ENABLED,
-      enabled
-    ),
+    /*
+     * Menyu va order alohida boshqariladi.
+     * Order test tugamaguncha false qoladi.
+     */
+    orderEnabled:
+      envBoolean(
+        process.env
+          .DELEVER_ORDER_ENABLED,
+        enabled
+      ),
 
-    baseUrl: normalizeBaseUrl(
-      process.env.DELEVER_BASE_URL
-    ),
+    baseUrl:
+      normalizeBaseUrl(
+        process.env
+          .DELEVER_BASE_URL
+      ),
 
-    clientId: String(
-      process.env.DELEVER_CLIENT_ID || ""
-    ).trim(),
+    clientId:
+      String(
+        process.env
+          .DELEVER_CLIENT_ID ||
+          ""
+      ).trim(),
 
-    clientSecret: String(
-      process.env.DELEVER_CLIENT_SECRET || ""
-    ).trim(),
+    clientSecret:
+      String(
+        process.env
+          .DELEVER_CLIENT_SECRET ||
+          ""
+      ).trim(),
 
-    restaurantId: String(
-      process.env.DELEVER_RESTAURANT_ID || ""
-    ).trim(),
+    restaurantId:
+      String(
+        process.env
+          .DELEVER_RESTAURANT_ID ||
+          ""
+      ).trim(),
 
-    tokenPath: normalizePath(
-      process.env.DELEVER_TOKEN_PATH,
-      "/v1/security/oauth/token"
-    ),
+    tokenPath:
+      normalizePath(
+        process.env
+          .DELEVER_TOKEN_PATH,
 
-    restaurantsPath: normalizePath(
-      process.env.DELEVER_RESTAURANTS_PATH,
-      "/v1/restaurants"
-    ),
+        "/v1/security/oauth/token"
+      ),
 
-    menuCompositionPath: normalizePath(
-      process.env.DELEVER_MENU_COMPOSITION_PATH,
-      "/v1/menu/{restaurantId}/composition"
-    ),
+    restaurantsPath:
+      normalizePath(
+        process.env
+          .DELEVER_RESTAURANTS_PATH,
 
-    menuAvailabilityPath: normalizePath(
-      process.env.DELEVER_MENU_AVAILABILITY_PATH,
-      "/v1/menu/{restaurantId}/availability"
-    ),
+        "/v1/restaurants"
+      ),
 
-    orderPath: normalizePath(
-      process.env.DELEVER_ORDER_PATH,
-      "/v1/order"
-    ),
+    menuCompositionPath:
+      normalizePath(
+        process.env
+          .DELEVER_MENU_COMPOSITION_PATH,
 
-    orderStatusPath: normalizePath(
-      process.env.DELEVER_ORDER_STATUS_PATH,
-      "/v1/order/{orderId}/status"
-    ),
+        "/v1/menu/{restaurantId}/composition"
+      ),
 
-    orderCancelPath: normalizePath(
-      process.env.DELEVER_ORDER_CANCEL_PATH,
-      "/v1/order/{orderId}"
-    ),
+    menuAvailabilityPath:
+      normalizePath(
+        process.env
+          .DELEVER_MENU_AVAILABILITY_PATH,
 
-    grantType: String(
-      process.env.DELEVER_GRANT_TYPE || ""
-    ).trim(),
+        "/v1/menu/{restaurantId}/availability"
+      ),
 
-    scope: String(
-      process.env.DELEVER_SCOPE || ""
-    ).trim(),
+    /*
+     * Rasmiy order endpoint:
+     * POST /v1/order
+     */
+    orderPath:
+      normalizePath(
+        process.env
+          .DELEVER_ORDER_PATH,
 
-    tokenAuthMode: String(
-      process.env.DELEVER_TOKEN_AUTH_MODE || "auto"
-    ).trim().toLowerCase(),
+        "/v1/order"
+      ),
 
-    authScheme: String(
-      process.env.DELEVER_AUTH_SCHEME || "Bearer"
-    ).trim(),
+    orderStatusPath:
+      normalizePath(
+        process.env
+          .DELEVER_ORDER_STATUS_PATH,
 
-    platform: String(
-      process.env.DELEVER_PLATFORM || "BOT"
-    ).trim(),
+        "/v1/order/{orderId}/status"
+      ),
 
-    timeoutMs: Math.max(
-      1000,
-      Number(process.env.DELEVER_TIMEOUT_MS) || 15000
-    ),
+    orderCancelPath:
+      normalizePath(
+        process.env
+          .DELEVER_ORDER_CANCEL_PATH,
+
+        "/v1/order/{orderId}"
+      ),
+
+    grantType:
+      String(
+        process.env
+          .DELEVER_GRANT_TYPE ||
+          ""
+      ).trim(),
+
+    scope:
+      String(
+        process.env
+          .DELEVER_SCOPE ||
+          ""
+      ).trim(),
+
+    tokenAuthMode:
+      String(
+        process.env
+          .DELEVER_TOKEN_AUTH_MODE ||
+          "auto"
+      )
+        .trim()
+        .toLowerCase(),
+
+    authScheme:
+      String(
+        process.env
+          .DELEVER_AUTH_SCHEME ||
+          "Bearer"
+      ).trim(),
+
+    timeoutMs:
+      Math.max(
+        1000,
+        Number(
+          process.env
+            .DELEVER_TIMEOUT_MS
+        ) || 15000
+      ),
   };
 };
 
 const getPublicConfig = () => {
-  const c = getConfig();
+  const config =
+    getConfig();
 
   return {
-    enabled: c.enabled,
-    orderEnabled: c.orderEnabled,
+    enabled:
+      config.enabled,
 
-    configured: Boolean(
-      c.baseUrl &&
-      c.clientId &&
-      c.clientSecret &&
-      c.restaurantId
-    ),
+    orderEnabled:
+      config.orderEnabled,
 
-    baseUrl: c.baseUrl,
-    restaurantId: c.restaurantId,
-    clientIdConfigured: Boolean(c.clientId),
-    clientSecretConfigured: Boolean(c.clientSecret),
-    platform: c.platform,
-    tokenAuthMode: c.tokenAuthMode,
-    authScheme: c.authScheme || "raw",
+    configured:
+      Boolean(
+        config.baseUrl &&
+          config.clientId &&
+          config.clientSecret &&
+          config.restaurantId
+      ),
+
+    baseUrl:
+      config.baseUrl,
+
+    restaurantId:
+      config.restaurantId,
+
+    clientIdConfigured:
+      Boolean(
+        config.clientId
+      ),
+
+    clientSecretConfigured:
+      Boolean(
+        config.clientSecret
+      ),
+
+    tokenAuthMode:
+      config.tokenAuthMode,
+
+    authScheme:
+      config.authScheme ||
+      "raw",
   };
 };
 
-const assertConfigured = ({ requireRestaurant = false } = {}) => {
-  const c = getConfig();
+const assertConfigured = ({
+  requireRestaurant =
+    false,
+} = {}) => {
+  const config =
+    getConfig();
+
   const missing = [];
-  if (!c.baseUrl) missing.push("DELEVER_BASE_URL");
-  if (!c.clientId) missing.push("DELEVER_CLIENT_ID");
-  if (!c.clientSecret) missing.push("DELEVER_CLIENT_SECRET");
-  if (requireRestaurant && !c.restaurantId) missing.push("DELEVER_RESTAURANT_ID");
-  if (missing.length) {
-    throw new DeleverError(`Delever sozlamalari yetishmayapti: ${missing.join(", ")}`, {
-      code: "DELEVER_NOT_CONFIGURED",
-    });
+
+  if (!config.baseUrl) {
+    missing.push(
+      "DELEVER_BASE_URL"
+    );
   }
-  return c;
+
+  if (!config.clientId) {
+    missing.push(
+      "DELEVER_CLIENT_ID"
+    );
+  }
+
+  if (
+    !config.clientSecret
+  ) {
+    missing.push(
+      "DELEVER_CLIENT_SECRET"
+    );
+  }
+
+  if (
+    requireRestaurant &&
+    !config.restaurantId
+  ) {
+    missing.push(
+      "DELEVER_RESTAURANT_ID"
+    );
+  }
+
+  if (missing.length) {
+    throw new DeleverError(
+      `Delever sozlamalari yetishmayapti: ${missing.join(", ")}`,
+      {
+        code:
+          "DELEVER_NOT_CONFIGURED",
+      }
+    );
+  }
+
+  return config;
 };
 
-const replacePathParams = (template, params = {}) => {
-  let result = template;
-  for (const [key, value] of Object.entries(params)) {
-    result = result.replaceAll(`{${key}}`, encodeURIComponent(String(value)));
+const replacePathParams = (
+  template,
+  params = {}
+) => {
+  let result =
+    template;
+
+  for (
+    const [
+      key,
+      value,
+    ]
+    of Object.entries(
+      params
+    )
+  ) {
+    result =
+      result.replaceAll(
+        `{${key}}`,
+        encodeURIComponent(
+          String(value)
+        )
+      );
   }
+
   return result;
 };
 
-const joinUrl = (baseUrl, path) => {
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${normalizeBaseUrl(baseUrl)}${normalizePath(path)}`;
+const joinUrl = (
+  baseUrl,
+  path
+) => {
+  if (
+    /^https?:\/\//i.test(
+      path
+    )
+  ) {
+    return path;
+  }
+
+  return (
+    `${normalizeBaseUrl(
+      baseUrl
+    )}${normalizePath(
+      path
+    )}`
+  );
 };
 
-const decodeBase64Credentials = (value) => {
+const decodeBase64Credentials = (
+  value
+) => {
   try {
-    const decoded = Buffer.from(String(value || ""), "base64").toString("utf8");
-    return decoded.includes(":") ? decoded : "";
+    const decoded =
+      Buffer.from(
+        String(
+          value || ""
+        ),
+        "base64"
+      ).toString(
+        "utf8"
+      );
+
+    return decoded.includes(
+      ":"
+    )
+      ? decoded
+      : "";
   } catch {
     return "";
   }
 };
 
-const parseResponseBody = async (response) => {
-  const text = await response.text();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { return text; }
-};
+const parseResponseBody = async (
+  response
+) => {
+  const text =
+    await response.text();
 
-let tokenCache = { token: "", expiresAt: 0 };
-let tokenPromise = null;
-
-const clearTokenCache = () => {
-  tokenCache = { token: "", expiresAt: 0 };
-  tokenPromise = null;
-};
-
-const requestAccessToken = async ({ fetchImpl = fetch } = {}) => {
-  const c = assertConfigured();
-  const decodedSecret = decodeBase64Credentials(c.clientSecret);
-
-  // auto rejimda support bergan secret tayyor Base64 credential bo'lsa avval
-  // Basic header sinovdan o'tadi. Server qabul qilmasa client_secret body varianti
-  // bir marta avtomatik tekshiriladi.
-  const modes = c.tokenAuthMode === "auto" && decodedSecret
-    ? ["basic-secret", "body"]
-    : [c.tokenAuthMode === "auto" ? "body" : c.tokenAuthMode];
-
-  let lastFailure = null;
-  for (const mode of modes) {
-    const body = new URLSearchParams();
-    const headers = { "Content-Type": "application/x-www-form-urlencoded" };
-
-    if (c.clientId) body.set("client_id", c.clientId);
-    if (c.grantType) body.set("grant_type", c.grantType);
-    if (c.scope) body.set("scope", c.scope);
-
-    if (mode === "basic-secret") {
-      headers.Authorization = `Basic ${c.clientSecret}`;
-    } else if (mode === "basic-client") {
-      headers.Authorization = `Basic ${Buffer.from(`${c.clientId}:${c.clientSecret}`).toString("base64")}`;
-    } else {
-      body.set("client_secret", c.clientSecret);
-    }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), c.timeoutMs);
-    let response;
-    try {
-      response = await fetchImpl(joinUrl(c.baseUrl, c.tokenPath), {
-        method: "POST",
-        headers,
-        body: body.toString(),
-        signal: controller.signal,
-      });
-    } catch (error) {
-      const message = error?.name === "AbortError"
-        ? `Delever token so'rovi ${c.timeoutMs} ms ichida javob bermadi`
-        : `Delever token so'rovi bajarilmadi: ${error.message}`;
-      throw new DeleverError(message, { code: "DELEVER_TOKEN_NETWORK" });
-    } finally {
-      clearTimeout(timer);
-    }
-
-    const data = await parseResponseBody(response);
-    if (!response.ok) {
-      lastFailure = new DeleverError(`Delever token xatosi (${response.status})`, {
-        status: response.status,
-        code: "DELEVER_TOKEN_HTTP",
-        response: data,
-      });
-      continue;
-    }
-
-    const token = data?.access_token || data?.accessToken || data?.token || data?.data?.access_token || data?.data?.token;
-    if (!token) {
-      lastFailure = new DeleverError("Delever token javobida access token topilmadi", {
-        code: "DELEVER_TOKEN_MISSING",
-        response: data,
-      });
-      continue;
-    }
-
-    const expiresIn = Number(data?.expires_in || data?.expiresIn || data?.data?.expires_in || 3600);
-    tokenCache = {
-      token: String(token),
-      expiresAt: Date.now() + Math.max(60, expiresIn - 60) * 1000,
-    };
-    return tokenCache.token;
+  if (!text) {
+    return null;
   }
 
-  throw lastFailure || new DeleverError("Delever tokenini olib bo'lmadi", { code: "DELEVER_TOKEN_FAILED" });
+  try {
+    return JSON.parse(
+      text
+    );
+  } catch {
+    return text;
+  }
 };
 
-const getAccessToken = async ({ force = false, fetchImpl = fetch } = {}) => {
-  if (!force && tokenCache.token && tokenCache.expiresAt > Date.now()) return tokenCache.token;
-  if (!force && tokenPromise) return tokenPromise;
+let tokenCache = {
+  token: "",
+  expiresAt: 0,
+};
 
-  tokenPromise = requestAccessToken({ fetchImpl })
-    .finally(() => { tokenPromise = null; });
+let tokenPromise =
+  null;
+
+const clearTokenCache = () => {
+  tokenCache = {
+    token: "",
+    expiresAt: 0,
+  };
+
+  tokenPromise =
+    null;
+};
+
+const requestAccessToken = async ({
+  fetchImpl = fetch,
+} = {}) => {
+  const config =
+    assertConfigured();
+
+  const decodedSecret =
+    decodeBase64Credentials(
+      config.clientSecret
+    );
+
+  const modes =
+    config.tokenAuthMode ===
+      "auto" &&
+    decodedSecret
+      ? [
+          "basic-secret",
+          "body",
+        ]
+      : [
+          config
+            .tokenAuthMode ===
+          "auto"
+            ? "body"
+            : config
+                .tokenAuthMode,
+        ];
+
+  let lastFailure =
+    null;
+
+  for (
+    const mode
+    of modes
+  ) {
+    const body =
+      new URLSearchParams();
+
+    const headers = {
+      "Content-Type":
+        "application/x-www-form-urlencoded",
+    };
+
+    if (config.clientId) {
+      body.set(
+        "client_id",
+        config.clientId
+      );
+    }
+
+    if (config.grantType) {
+      body.set(
+        "grant_type",
+        config.grantType
+      );
+    }
+
+    if (config.scope) {
+      body.set(
+        "scope",
+        config.scope
+      );
+    }
+
+    if (
+      mode ===
+      "basic-secret"
+    ) {
+      headers.Authorization =
+        `Basic ${config.clientSecret}`;
+    } else if (
+      mode ===
+      "basic-client"
+    ) {
+      headers.Authorization =
+        `Basic ${Buffer.from(
+          `${config.clientId}:${config.clientSecret}`
+        ).toString("base64")}`;
+    } else {
+      body.set(
+        "client_secret",
+        config.clientSecret
+      );
+    }
+
+    const controller =
+      new AbortController();
+
+    const timer =
+      setTimeout(
+        () =>
+          controller.abort(),
+        config.timeoutMs
+      );
+
+    let response;
+
+    try {
+      response =
+        await fetchImpl(
+          joinUrl(
+            config.baseUrl,
+            config.tokenPath
+          ),
+          {
+            method: "POST",
+            headers,
+
+            body:
+              body.toString(),
+
+            signal:
+              controller.signal,
+          }
+        );
+    } catch (error) {
+      const message =
+        error?.name ===
+        "AbortError"
+          ? `Delever token so'rovi ${config.timeoutMs} ms ichida javob bermadi`
+          : `Delever token so'rovi bajarilmadi: ${error.message}`;
+
+      throw new DeleverError(
+        message,
+        {
+          code:
+            "DELEVER_TOKEN_NETWORK",
+        }
+      );
+    } finally {
+      clearTimeout(
+        timer
+      );
+    }
+
+    const data =
+      await parseResponseBody(
+        response
+      );
+
+    if (!response.ok) {
+      lastFailure =
+        new DeleverError(
+          `Delever token xatosi (${response.status})`,
+          {
+            status:
+              response.status,
+
+            code:
+              "DELEVER_TOKEN_HTTP",
+
+            response:
+              data,
+          }
+        );
+
+      continue;
+    }
+
+    const token =
+      data?.access_token ||
+      data?.accessToken ||
+      data?.token ||
+      data?.data
+        ?.access_token ||
+      data?.data?.token;
+
+    if (!token) {
+      lastFailure =
+        new DeleverError(
+          "Delever token javobida access token topilmadi",
+          {
+            code:
+              "DELEVER_TOKEN_MISSING",
+
+            response:
+              data,
+          }
+        );
+
+      continue;
+    }
+
+    const expiresIn =
+      Number(
+        data?.expires_in ||
+          data?.expiresIn ||
+          data?.data
+            ?.expires_in ||
+          3600
+      );
+
+    tokenCache = {
+      token:
+        String(token),
+
+      expiresAt:
+        Date.now() +
+        Math.max(
+          60,
+          expiresIn - 60
+        ) *
+          1000,
+    };
+
+    return tokenCache
+      .token;
+  }
+
+  throw (
+    lastFailure ||
+    new DeleverError(
+      "Delever tokenini olib bo'lmadi",
+      {
+        code:
+          "DELEVER_TOKEN_FAILED",
+      }
+    )
+  );
+};
+
+const getAccessToken = async ({
+  force = false,
+  fetchImpl = fetch,
+} = {}) => {
+  if (
+    !force &&
+    tokenCache.token &&
+    tokenCache.expiresAt >
+      Date.now()
+  ) {
+    return tokenCache
+      .token;
+  }
+
+  if (
+    !force &&
+    tokenPromise
+  ) {
+    return tokenPromise;
+  }
+
+  tokenPromise =
+    requestAccessToken({
+      fetchImpl,
+    }).finally(() => {
+      tokenPromise =
+        null;
+    });
+
   return tokenPromise;
 };
 
-const buildApiAuthorization = (token, scheme) => {
-  const normalized = String(scheme || "").trim();
-  if (!normalized || normalized.toLowerCase() === "raw") return token;
-  return `${normalized} ${token}`;
+const buildApiAuthorization = (
+  token,
+  scheme
+) => {
+  const normalized =
+    String(scheme || "")
+      .trim();
+
+  if (
+    !normalized ||
+    normalized.toLowerCase() ===
+      "raw"
+  ) {
+    return token;
+  }
+
+  return (
+    `${normalized} ${token}`
+  );
 };
 
-const deleverRequest = async (path, {
-  method = "GET",
-  body,
-  headers = {},
-  retryAuth = true,
-  fetchImpl = fetch,
-} = {}) => {
-  const c = assertConfigured();
-  const token = await getAccessToken({ fetchImpl });
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), c.timeoutMs);
+const deleverRequest = async (
+  path,
+  {
+    method = "GET",
+    body,
+    headers = {},
+    retryAuth = true,
+    fetchImpl = fetch,
+  } = {}
+) => {
+  const config =
+    assertConfigured();
+
+  const token =
+    await getAccessToken({
+      fetchImpl,
+    });
+
+  const controller =
+    new AbortController();
+
+  const timer =
+    setTimeout(
+      () =>
+        controller.abort(),
+      config.timeoutMs
+    );
 
   let response;
+
   try {
-    response = await fetchImpl(joinUrl(c.baseUrl, path), {
-      method,
-      headers: {
-        Accept: "application/json",
-        Authorization: buildApiAuthorization(token, c.authScheme),
-        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-        ...headers,
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: controller.signal,
-    });
+    response =
+      await fetchImpl(
+        joinUrl(
+          config.baseUrl,
+          path
+        ),
+        {
+          method,
+
+          headers: {
+            Accept:
+              "application/json",
+
+            Authorization:
+              buildApiAuthorization(
+                token,
+                config.authScheme
+              ),
+
+            ...(
+              body !== undefined
+                ? {
+                    "Content-Type":
+                      "application/json",
+                  }
+                : {}
+            ),
+
+            ...headers,
+          },
+
+          body:
+            body === undefined
+              ? undefined
+              : JSON.stringify(
+                  body
+                ),
+
+          signal:
+            controller.signal,
+        }
+      );
   } catch (error) {
-    const message = error?.name === "AbortError"
-      ? `Delever API ${c.timeoutMs} ms ichida javob bermadi`
-      : `Delever API so'rovi bajarilmadi: ${error.message}`;
-    throw new DeleverError(message, { code: "DELEVER_NETWORK" });
+    const message =
+      error?.name ===
+      "AbortError"
+        ? `Delever API ${config.timeoutMs} ms ichida javob bermadi`
+        : `Delever API so'rovi bajarilmadi: ${error.message}`;
+
+    throw new DeleverError(
+      message,
+      {
+        code:
+          "DELEVER_NETWORK",
+      }
+    );
   } finally {
-    clearTimeout(timer);
+    clearTimeout(
+      timer
+    );
   }
 
-  const data = await parseResponseBody(response);
-  if ((response.status === 401 || response.status === 403) && retryAuth) {
+  const data =
+    await parseResponseBody(
+      response
+    );
+
+  if (
+    (
+      response.status ===
+        401 ||
+      response.status ===
+        403
+    ) &&
+    retryAuth
+  ) {
     clearTokenCache();
-    return deleverRequest(path, { method, body, headers, retryAuth: false, fetchImpl });
+
+    return deleverRequest(
+      path,
+      {
+        method,
+        body,
+        headers,
+        retryAuth: false,
+        fetchImpl,
+      }
+    );
   }
+
   if (!response.ok) {
-    throw new DeleverError(`Delever API xatosi (${response.status})`, {
-      status: response.status,
-      code: "DELEVER_HTTP",
-      response: data,
-    });
+    throw new DeleverError(
+      `Delever API xatosi (${response.status})`,
+      {
+        status:
+          response.status,
+
+        code:
+          "DELEVER_HTTP",
+
+        response:
+          data,
+      }
+    );
   }
+
   return data;
 };
 
-const getRestaurants = (options) => {
-  const c = assertConfigured();
-  return deleverRequest(c.restaurantsPath, options);
+const getRestaurants = (
+  options
+) => {
+  const config =
+    assertConfigured();
+
+  return deleverRequest(
+    config.restaurantsPath,
+    options
+  );
 };
 
-const getMenuComposition = (restaurantId, options) => {
-  const c = assertConfigured({ requireRestaurant: !restaurantId });
-  const id = restaurantId || c.restaurantId;
-  return deleverRequest(replacePathParams(c.menuCompositionPath, { restaurantId: id }), options);
+const getMenuComposition = (
+  restaurantId,
+  options
+) => {
+  const config =
+    assertConfigured({
+      requireRestaurant:
+        !restaurantId,
+    });
+
+  const id =
+    restaurantId ||
+    config.restaurantId;
+
+  return deleverRequest(
+    replacePathParams(
+      config
+        .menuCompositionPath,
+      {
+        restaurantId:
+          id,
+      }
+    ),
+    options
+  );
 };
 
-const getMenuAvailability = (restaurantId, options) => {
-  const c = assertConfigured({ requireRestaurant: !restaurantId });
-  const id = restaurantId || c.restaurantId;
-  return deleverRequest(replacePathParams(c.menuAvailabilityPath, { restaurantId: id }), options);
+const getMenuAvailability = (
+  restaurantId,
+  options
+) => {
+  const config =
+    assertConfigured({
+      requireRestaurant:
+        !restaurantId,
+    });
+
+  const id =
+    restaurantId ||
+    config.restaurantId;
+
+  return deleverRequest(
+    replacePathParams(
+      config
+        .menuAvailabilityPath,
+      {
+        restaurantId:
+          id,
+      }
+    ),
+    options
+  );
 };
 
-const createOrder = (payload, options = {}) => {
-  const c = assertConfigured({ requireRestaurant: true });
-  return deleverRequest(c.orderPath, { ...options, method: "POST", body: payload });
+const createOrder = (
+  payload,
+  options = {}
+) => {
+  const config =
+    assertConfigured({
+      requireRestaurant:
+        true,
+    });
+
+  return deleverRequest(
+    config.orderPath,
+    {
+      ...options,
+
+      method:
+        "POST",
+
+      body:
+        payload,
+    }
+  );
 };
 
-const getOrderStatus = (orderId, options) => {
-  const c = assertConfigured();
-  return deleverRequest(replacePathParams(c.orderStatusPath, { orderId }), options);
+const getOrderStatus = (
+  orderId,
+  options
+) => {
+  const config =
+    assertConfigured();
+
+  return deleverRequest(
+    replacePathParams(
+      config
+        .orderStatusPath,
+      {
+        orderId,
+      }
+    ),
+    options
+  );
 };
 
-const cancelOrder = (orderId, body = {}, options = {}) => {
-  const c = assertConfigured();
-  return deleverRequest(replacePathParams(c.orderCancelPath, { orderId }), {
-    ...options,
-    method: "DELETE",
-    body,
-  });
+const cancelOrder = (
+  orderId,
+  body = {},
+  options = {}
+) => {
+  const config =
+    assertConfigured();
+
+  return deleverRequest(
+    replacePathParams(
+      config
+        .orderCancelPath,
+      {
+        orderId,
+      }
+    ),
+    {
+      ...options,
+
+      method:
+        "DELETE",
+
+      body,
+    }
+  );
 };
 
 module.exports = {

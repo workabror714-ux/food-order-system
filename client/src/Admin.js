@@ -25,14 +25,50 @@ export default function Admin() {
 
   const fetchFoods = async () => {
     try {
-      const data = await api.get("/api/foods");
+      let data = [];
+
+      try {
+        const adminData = await api.get(
+          "/api/admin/foods?limit=500",
+          true
+        );
+        data = Array.isArray(adminData?.foods) ? adminData.foods : [];
+      } catch {
+        data = await api.get("/api/foods");
+      }
+
       setFoods(data);
-      const cats = [];
-      data.forEach(f => {
-        const key = getField(f.category, "uz");
-        if (key && !cats.find(c => getField(c, "uz") === key)) cats.push(f.category);
+
+      const categoryMap = new Map();
+
+      data.forEach((food) => {
+        const category =
+          food.category && typeof food.category === "object"
+            ? {
+                uz: getField(food.category, "uz"),
+                ru: getField(food.category, "ru"),
+                en: getField(food.category, "en"),
+              }
+            : {
+                uz: String(food.category || ""),
+                ru: String(food.category || ""),
+                en: String(food.category || ""),
+              };
+
+        const key =
+          food.deleverCategoryId ||
+          `${food.source || "local"}:${category.ru || category.uz}`;
+
+        if (!key || categoryMap.has(key)) return;
+
+        categoryMap.set(key, {
+          ...category,
+          deleverCategoryId: food.deleverCategoryId || "",
+          source: food.source || "local",
+        });
       });
-      setCategories(sortCategories(cats));
+
+      setCategories(sortCategories([...categoryMap.values()]));
     } catch {}
   };
   useEffect(() => { fetchFoods(); }, []);
@@ -69,7 +105,14 @@ export default function Admin() {
 
       <div className="admin-content">
         {tab === "foods" && (
-          <FoodsTab foods={foods} setFoods={setFoods} categories={categories} setCategories={setCategories} refetch={fetchFoods} canSyncDelever={savedUser.role === "superadmin"} />
+          <FoodsTab
+            foods={foods}
+            setFoods={setFoods}
+            categories={categories}
+            setCategories={setCategories}
+            refetch={fetchFoods}
+            savedUser={savedUser}
+          />
         )}
         {tab === "orders" && <OrdersTab onNewCount={setNewOrderCount} />}
         {tab === "banner" && <BannerTab categories={categories} savedUser={savedUser} />}

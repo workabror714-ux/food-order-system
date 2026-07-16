@@ -13,10 +13,7 @@ const getAtPath = (obj, path) => {
   let current = obj;
 
   for (const key of path.split(".")) {
-    if (
-      !current ||
-      typeof current !== "object"
-    ) {
+    if (!current || typeof current !== "object") {
       return undefined;
     }
 
@@ -28,14 +25,8 @@ const getAtPath = (obj, path) => {
 
 const firstArrayAt = (obj, paths) => {
   for (const path of paths) {
-    const value = getAtPath(
-      obj,
-      path
-    );
-
-    if (Array.isArray(value)) {
-      return value;
-    }
+    const value = getAtPath(obj, path);
+    if (Array.isArray(value)) return value;
   }
 
   return [];
@@ -45,138 +36,54 @@ const cleanText = (value) =>
   String(value || "").trim();
 
 const normalizeLanguage = (value) => {
-  const language =
-    cleanText(value)
-      .toLowerCase()
-      .replace("_", "-");
+  const language = cleanText(value)
+    .toLowerCase()
+    .replace("_", "-");
 
-  if (
-    language === "uz" ||
-    language.startsWith("uz-")
-  ) {
+  if (language === "uz" || language.startsWith("uz-")) {
     return "uz";
   }
 
-  if (
-    language === "ru" ||
-    language.startsWith("ru-")
-  ) {
+  if (language === "ru" || language.startsWith("ru-")) {
     return "ru";
   }
 
-  if (
-    language === "en" ||
-    language.startsWith("en-")
-  ) {
+  if (language === "en" || language.startsWith("en-")) {
     return "en";
   }
 
   return "";
 };
 
-const localizedText = (
-  value,
-  fallback = ""
-) => {
-  if (
-    typeof value === "string" ||
-    typeof value === "number"
-  ) {
-    const text =
-      cleanText(value);
-
-    return {
-      uz: text,
-      ru: text,
-      en: text,
-    };
-  }
-
-  const data =
-    value &&
-    typeof value === "object"
-      ? value
-      : {};
-
-  const uz = cleanText(
-    firstDefined(
-      data.uz,
-      data.uz_UZ,
-      data.uzUz,
-      data.nameUz,
-      data.titleUz,
-      data.descriptionUz,
-      data.value,
-      data.name,
-      data.title,
-      data.description,
-      fallback
-    )
+const sourceLanguage = () => {
+  const language = normalizeLanguage(
+    process.env.DELEVER_SOURCE_LANGUAGE || "ru"
   );
 
-  const ru = cleanText(
-    firstDefined(
-      data.ru,
-      data.ru_RU,
-      data.ruRu,
-      data.nameRu,
-      data.titleRu,
-      data.descriptionRu,
-      uz
-    )
-  );
-
-  const en = cleanText(
-    firstDefined(
-      data.en,
-      data.en_US,
-      data.enEn,
-      data.nameEn,
-      data.titleEn,
-      data.descriptionEn,
-      uz
-    )
-  );
-
-  return {
-    uz,
-    ru,
-    en,
-  };
+  return language || "ru";
 };
 
-const valueFromTranslationEntry = (
-  entry,
-  fieldNames
-) => {
-  if (
-    typeof entry === "string" ||
-    typeof entry === "number"
-  ) {
+const emptyLocalized = () => ({
+  uz: "",
+  ru: "",
+  en: "",
+});
+
+const translationValue = (entry, fieldNames = []) => {
+  if (typeof entry === "string" || typeof entry === "number") {
     return cleanText(entry);
   }
 
-  if (
-    !entry ||
-    typeof entry !== "object"
-  ) {
+  if (!entry || typeof entry !== "object") {
     return "";
   }
 
   for (const field of fieldNames) {
-    const value =
-      entry[field];
+    const value = entry[field];
 
-    if (
-      typeof value === "string" ||
-      typeof value === "number"
-    ) {
-      const text =
-        cleanText(value);
-
-      if (text) {
-        return text;
-      }
+    if (typeof value === "string" || typeof value === "number") {
+      const text = cleanText(value);
+      if (text) return text;
     }
   }
 
@@ -184,197 +91,162 @@ const valueFromTranslationEntry = (
     firstDefined(
       entry.value,
       entry.text,
-      entry.label
+      entry.label,
+      entry.translation
     )
   );
 };
 
+const applyLanguageObject = (
+  result,
+  translations,
+  fieldNames
+) => {
+  if (!translations || typeof translations !== "object") {
+    return;
+  }
+
+  if (Array.isArray(translations)) {
+    for (const entry of translations) {
+      const language = normalizeLanguage(
+        firstDefined(
+          entry?.language,
+          entry?.lang,
+          entry?.locale,
+          entry?.code,
+          entry?.languageCode
+        )
+      );
+
+      if (!language) continue;
+
+      const text = translationValue(entry, fieldNames);
+      if (text) result[language] = text;
+    }
+
+    return;
+  }
+
+  for (const [key, entry] of Object.entries(translations)) {
+    const language = normalizeLanguage(key);
+
+    if (!language) continue;
+
+    const text = translationValue(entry, fieldNames);
+    if (text) result[language] = text;
+  }
+};
+
 /*
- * Delever turli integratsiyalarda tarjimalarni turli
- * formatda qaytarishi mumkin. Ushbu helper quyidagilarni
- * qo'llaydi:
+ * Muhim:
+ * Delever composition ko'pincha faqat bitta `name` yoki
+ * `description` yuboradi. Uni uchala tilga ko'chirmaymiz.
  *
- * name: { uz, ru, en }
- * nameUz / nameRu / nameEn
- * name_uz / name_ru / name_en
- * translations: { uz: {...}, ru: {...}, en: {...} }
- * translations: [{ language: "uz", name: "..." }]
+ * Agar API nameTranslations / descriptionTranslations /
+ * translations / localizations qaytarsa, uz/ru/en alohida olinadi.
  */
 const localizedEntityText = (
   entity,
   {
     baseFields,
+    translationFields = [],
     fallback = "",
   }
 ) => {
   const source =
-    entity &&
-    typeof entity === "object"
+    entity && typeof entity === "object"
       ? entity
       : {};
 
-  const firstBaseValue =
-    firstDefined(
-      ...baseFields.map(
-        (field) =>
-          source[field]
-      )
-    );
+  const result = emptyLocalized();
 
-  const result =
-    localizedText(
-      firstBaseValue,
-      fallback
-    );
+  const baseValue = firstDefined(
+    ...baseFields.map((field) => source[field])
+  );
 
-  const fieldCandidates = {
-    uz: [],
-    ru: [],
-    en: [],
-  };
-
-  for (const field of baseFields) {
-    fieldCandidates.uz.push(
-      source[`${field}Uz`],
-      source[`${field}_uz`],
-      source[`${field}UZ`]
-    );
-
-    fieldCandidates.ru.push(
-      source[`${field}Ru`],
-      source[`${field}_ru`],
-      source[`${field}RU`]
-    );
-
-    fieldCandidates.en.push(
-      source[`${field}En`],
-      source[`${field}_en`],
-      source[`${field}EN`]
-    );
-  }
-
-  for (
-    const language
-    of ["uz", "ru", "en"]
+  if (
+    typeof baseValue === "string" ||
+    typeof baseValue === "number"
   ) {
-    const direct =
-      cleanText(
+    result[sourceLanguage()] = cleanText(baseValue);
+  } else if (baseValue && typeof baseValue === "object") {
+    for (const language of ["uz", "ru", "en"]) {
+      const text = cleanText(
         firstDefined(
-          ...fieldCandidates[
-            language
-          ]
+          baseValue[language],
+          baseValue[`${language}_${language.toUpperCase()}`],
+          baseValue[`${language}-${language.toUpperCase()}`]
         )
       );
 
-    if (direct) {
-      result[language] =
-        direct;
+      if (text) result[language] = text;
     }
   }
 
-  const translations =
-    firstDefined(
-      source.translations,
-      source.localizations,
-      source.localizedValues,
-      source.localized
+  for (const field of baseFields) {
+    const direct = {
+      uz: firstDefined(
+        source[`${field}Uz`],
+        source[`${field}_uz`],
+        source[`${field}UZ`]
+      ),
+      ru: firstDefined(
+        source[`${field}Ru`],
+        source[`${field}_ru`],
+        source[`${field}RU`]
+      ),
+      en: firstDefined(
+        source[`${field}En`],
+        source[`${field}_en`],
+        source[`${field}EN`]
+      ),
+    };
+
+    for (const language of ["uz", "ru", "en"]) {
+      const text = cleanText(direct[language]);
+      if (text) result[language] = text;
+    }
+  }
+
+  const candidateFields = [
+    ...translationFields,
+    "translations",
+    "localizations",
+    "localizedValues",
+    "localized",
+  ];
+
+  for (const field of candidateFields) {
+    applyLanguageObject(
+      result,
+      source[field],
+      baseFields
     );
-
-  if (
-    translations &&
-    !Array.isArray(
-      translations
-    ) &&
-    typeof translations ===
-      "object"
-  ) {
-    for (
-      const language
-      of ["uz", "ru", "en"]
-    ) {
-      const entry =
-        firstDefined(
-          translations[
-            language
-          ],
-          translations[
-            `${language}_${language.toUpperCase()}`
-          ],
-          translations[
-            `${language}-${language.toUpperCase()}`
-          ]
-        );
-
-      const text =
-        valueFromTranslationEntry(
-          entry,
-          baseFields
-        );
-
-      if (text) {
-        result[language] =
-          text;
-      }
-    }
   }
 
-  if (
-    Array.isArray(
-      translations
-    )
-  ) {
-    for (
-      const entry
-      of translations
-    ) {
-      const language =
-        normalizeLanguage(
-          firstDefined(
-            entry?.language,
-            entry?.lang,
-            entry?.locale,
-            entry?.code
-          )
-        );
+  /*
+   * Ba'zi APIlar translations ichida:
+   * { uz: { name: "...", description: "..." } }
+   * shaklida qaytaradi.
+   */
+  const genericTranslations = firstDefined(
+    source.translations,
+    source.localizations,
+    source.localizedValues,
+    source.localized
+  );
 
-      if (!language) {
-        continue;
-      }
+  applyLanguageObject(
+    result,
+    genericTranslations,
+    baseFields
+  );
 
-      const text =
-        valueFromTranslationEntry(
-          entry,
-          baseFields
-        );
-
-      if (text) {
-        result[language] =
-          text;
-      }
-    }
+  if (!result.uz && !result.ru && !result.en && fallback) {
+    result[sourceLanguage()] = cleanText(fallback);
   }
 
-  const fallbackText =
-    cleanText(
-      result.uz ||
-      result.ru ||
-      result.en ||
-      fallback
-    );
-
-  return {
-    uz:
-      cleanText(result.uz) ||
-      fallbackText,
-
-    ru:
-      cleanText(result.ru) ||
-      fallbackText,
-
-    en:
-      cleanText(result.en) ||
-      fallbackText,
-  };
+  return result;
 };
 
 const entityId = (item) =>
@@ -405,10 +277,7 @@ const categoryId = (item) =>
   );
 
 const numeric = (value) => {
-  if (
-    typeof value === "number" &&
-    Number.isFinite(value)
-  ) {
+  if (typeof value === "number" && Number.isFinite(value)) {
     return value;
   }
 
@@ -417,23 +286,13 @@ const numeric = (value) => {
       value
         .replace(/\s/g, "")
         .replace(",", ".")
-        .replace(
-          /[^0-9.-]/g,
-          ""
-        )
+        .replace(/[^0-9.-]/g, "")
     );
 
-    return Number.isFinite(
-      number
-    )
-      ? number
-      : null;
+    return Number.isFinite(number) ? number : null;
   }
 
-  if (
-    value &&
-    typeof value === "object"
-  ) {
+  if (value && typeof value === "object") {
     return numeric(
       firstDefined(
         value.value,
@@ -448,84 +307,59 @@ const numeric = (value) => {
 };
 
 const extractPrice = (item) => {
-  const direct =
-    numeric(
+  const direct = numeric(
+    firstDefined(
+      item?.price,
+      item?.cost,
+      item?.salePrice,
+      item?.currentPrice,
+      item?.priceValue,
+      item?.defaultPrice
+    )
+  );
+
+  if (direct !== null) return direct;
+
+  for (const price of asArray(item?.prices)) {
+    const value = numeric(
       firstDefined(
-        item?.price,
-        item?.cost,
-        item?.salePrice,
-        item?.currentPrice,
-        item?.priceValue,
-        item?.defaultPrice
+        price?.price,
+        price?.value,
+        price?.amount
       )
     );
 
-  if (direct !== null) {
-    return direct;
-  }
-
-  for (
-    const price
-    of asArray(
-      item?.prices
-    )
-  ) {
-    const value =
-      numeric(
-        firstDefined(
-          price?.price,
-          price?.value,
-          price?.amount
-        )
-      );
-
-    if (value !== null) {
-      return value;
-    }
+    if (value !== null) return value;
   }
 
   return null;
 };
 
 const extractImage = (item) => {
-  const direct =
-    firstDefined(
-      item?.imageUrl,
-      item?.image,
-      item?.pictureUrl,
-      item?.photoUrl,
-      item?.picture,
-      item?.photo
-    );
+  const direct = firstDefined(
+    item?.imageUrl,
+    item?.image,
+    item?.pictureUrl,
+    item?.photoUrl,
+    item?.picture,
+    item?.photo
+  );
 
-  if (
-    typeof direct === "string"
-  ) {
+  if (typeof direct === "string") {
     return cleanText(direct);
   }
 
-  if (
-    direct &&
-    typeof direct === "object"
-  ) {
-    const url =
-      firstDefined(
-        direct.url,
-        direct.src,
-        direct.original
-      );
+  if (direct && typeof direct === "object") {
+    const url = firstDefined(
+      direct.url,
+      direct.src,
+      direct.original
+    );
 
-    if (url) {
-      return cleanText(url);
-    }
+    if (url) return cleanText(url);
   }
 
-  for (
-    const image
-    of asArray(
-      item?.images
-    )
-  ) {
+  for (const image of asArray(item?.images)) {
     const url =
       typeof image === "string"
         ? image
@@ -535,17 +369,13 @@ const extractImage = (item) => {
             image?.original
           );
 
-    if (url) {
-      return cleanText(url);
-    }
+    if (url) return cleanText(url);
   }
 
   return "";
 };
 
-const extractModifierGroups = (
-  item
-) =>
+const extractModifierGroups = (item) =>
   asArray(
     firstDefined(
       item?.modifierGroups,
@@ -556,10 +386,7 @@ const extractModifierGroups = (
     )
   );
 
-const extractSortOrder = (
-  item,
-  fallback = 0
-) =>
+const extractSortOrder = (item, fallback = 0) =>
   Number(
     firstDefined(
       item?.sortOrder,
@@ -571,23 +398,16 @@ const extractSortOrder = (
     )
   ) || 0;
 
-const explicitAvailability = (
-  item
-) => {
-  const direct =
-    firstDefined(
-      item?.isAvailable,
-      item?.available,
-      item?.is_active,
-      item?.active,
-      item?.enabled
-    );
+const explicitAvailability = (item) => {
+  const direct = firstDefined(
+    item?.isAvailable,
+    item?.available,
+    item?.is_active,
+    item?.active,
+    item?.enabled
+  );
 
-  if (
-    typeof direct === "boolean"
-  ) {
-    return direct;
-  }
+  if (typeof direct === "boolean") return direct;
 
   if (
     item?.isDeleted === true ||
@@ -598,495 +418,303 @@ const explicitAvailability = (
     return false;
   }
 
-  const stock =
-    numeric(
-      firstDefined(
-        item?.stock,
-        item?.balance,
-        item?.quantity,
-        item?.remaining
-      )
-    );
+  const stock = numeric(
+    firstDefined(
+      item?.stock,
+      item?.balance,
+      item?.quantity,
+      item?.remaining
+    )
+  );
 
-  if (stock !== null) {
-    return stock > 0;
-  }
-
-  return null;
+  return stock === null ? null : stock > 0;
 };
 
-const compositionCollections = (
-  payload
-) => {
-  const categories =
-    firstArrayAt(
-      payload,
-      [
-        "categories",
-        "itemCategories",
-        "menuCategories",
-        "groups",
-        "sections",
+const compositionCollections = (payload) => {
+  const categories = firstArrayAt(payload, [
+    "categories",
+    "itemCategories",
+    "menuCategories",
+    "groups",
+    "sections",
+    "data.categories",
+    "data.itemCategories",
+    "data.menuCategories",
+    "data.groups",
+    "data.sections",
+    "result.categories",
+    "result.itemCategories",
+    "result.menuCategories",
+    "result.groups",
+    "result.sections",
+    "menu.categories",
+    "data.menu.categories",
+    "result.menu.categories",
+  ]);
 
-        "data.categories",
-        "data.itemCategories",
-        "data.menuCategories",
-        "data.groups",
-        "data.sections",
-
-        "result.categories",
-        "result.itemCategories",
-        "result.menuCategories",
-        "result.groups",
-        "result.sections",
-
-        "menu.categories",
-        "data.menu.categories",
-        "result.menu.categories",
-      ]
-    );
-
-  const directProducts =
-    firstArrayAt(
-      payload,
-      [
-        "items",
-        "products",
-        "dishes",
-        "menuItems",
-        "goods",
-        "nomenclature",
-
-        "data.items",
-        "data.products",
-        "data.dishes",
-        "data.menuItems",
-        "data.goods",
-        "data.nomenclature",
-
-        "result.items",
-        "result.products",
-        "result.dishes",
-        "result.menuItems",
-        "result.goods",
-        "result.nomenclature",
-
-        "menu.items",
-        "menu.products",
-        "data.menu.items",
-        "data.menu.products",
-        "result.menu.items",
-        "result.menu.products",
-      ]
-    );
+  const directProducts = firstArrayAt(payload, [
+    "items",
+    "products",
+    "dishes",
+    "menuItems",
+    "goods",
+    "nomenclature",
+    "data.items",
+    "data.products",
+    "data.dishes",
+    "data.menuItems",
+    "data.goods",
+    "data.nomenclature",
+    "result.items",
+    "result.products",
+    "result.dishes",
+    "result.menuItems",
+    "result.goods",
+    "result.nomenclature",
+    "menu.items",
+    "menu.products",
+    "data.menu.items",
+    "data.menu.products",
+    "result.menu.items",
+    "result.menu.products",
+  ]);
 
   const nestedProducts = [];
 
-  for (
-    const category
-    of categories
-  ) {
-    for (
-      const key
-      of [
-        "items",
-        "products",
-        "dishes",
-        "menuItems",
-        "goods",
-      ]
-    ) {
-      for (
-        const product
-        of asArray(
-          category?.[key]
-        )
-      ) {
+  for (const category of categories) {
+    for (const key of [
+      "items",
+      "products",
+      "dishes",
+      "menuItems",
+      "goods",
+    ]) {
+      for (const product of asArray(category?.[key])) {
         nestedProducts.push({
           ...product,
-
           categoryId:
-            categoryId(product) ||
-            entityId(category),
+            categoryId(product) || entityId(category),
         });
       }
     }
   }
 
-  const dedup =
-    new Map();
+  const dedup = new Map();
 
-  for (
-    const product
-    of [
-      ...directProducts,
-      ...nestedProducts,
-    ]
-  ) {
-    const id =
-      entityId(product);
-
-    if (id) {
-      dedup.set(
-        id,
-        product
-      );
-    }
+  for (const product of [
+    ...directProducts,
+    ...nestedProducts,
+  ]) {
+    const id = entityId(product);
+    if (id) dedup.set(id, product);
   }
 
   return {
     categories,
-    products: [
-      ...dedup.values(),
-    ],
+    products: [...dedup.values()],
   };
 };
 
 const safeDate = (value) => {
-  if (!value) {
-    return null;
-  }
+  if (!value) return null;
 
-  const date =
-    new Date(value);
-
-  return Number.isNaN(
-    date.getTime()
-  )
-    ? null
-    : date;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const normalizeComposition = (
-  payload,
-  restaurantId
-) => {
-  const {
-    categories,
-    products,
-  } =
-    compositionCollections(
-      payload || {}
-    );
+const normalizeComposition = (payload, restaurantId) => {
+  const { categories, products } =
+    compositionCollections(payload || {});
 
-  const categoryMap =
-    new Map();
+  const categoryMap = new Map();
 
-  categories.forEach(
-    (
-      category,
-      index
-    ) => {
-      const id =
-        entityId(category);
+  categories.forEach((category, index) => {
+    const id = entityId(category);
+    if (!id) return;
 
-      if (!id) {
-        return;
-      }
-
-      categoryMap.set(
-        id,
-        {
-          id,
-
-          title:
-            localizedEntityText(
-              category,
-              {
-                baseFields: [
-                  "name",
-                  "title",
-                  "label",
-                ],
-
-                fallback:
-                  "Boshqa",
-              }
-            ),
-
-          sortOrder:
-            extractSortOrder(
-              category,
-              index
-            ),
-        }
-      );
-    }
-  );
+    categoryMap.set(id, {
+      id,
+      title: localizedEntityText(category, {
+        baseFields: ["name", "title", "label"],
+        translationFields: [
+          "nameTranslations",
+          "titleTranslations",
+          "labelTranslations",
+        ],
+        fallback: "Boshqa",
+      }),
+      sortOrder: extractSortOrder(category, index),
+    });
+  });
 
   const normalized = [];
   const skipped = [];
 
-  products.forEach(
-    (
-      product,
-      index
-    ) => {
-      const id =
-        entityId(product);
+  products.forEach((product, index) => {
+    const id = entityId(product);
+    const price = extractPrice(product);
 
-      const price =
-        extractPrice(product);
-
-      if (
-        !id ||
-        price === null ||
-        price < 0
-      ) {
-        skipped.push({
-          id,
-
-          reason:
-            !id
-              ? "ID topilmadi"
-              : "Narx topilmadi",
-
-          raw:
-            product,
-        });
-
-        return;
-      }
-
-      const catId =
-        categoryId(product);
-
-      const category =
-        categoryMap.get(
-          catId
-        );
-
-      const title =
-        localizedEntityText(
-          product,
-          {
-            baseFields: [
-              "name",
-              "title",
-              "label",
-            ],
-
-            fallback:
-              `Taom ${id}`,
-          }
-        );
-
-      const description =
-        localizedEntityText(
-          product,
-          {
-            baseFields: [
-              "description",
-              "desc",
-              "comment",
-            ],
-
-            fallback: "",
-          }
-        );
-
-      const categoryTitle =
-        category?.title ||
-        localizedEntityText(
-          {
-            name:
-              firstDefined(
-                product?.categoryName,
-                product?.category?.name,
-                product?.groupName
-              ),
-
-            nameUz:
-              firstDefined(
-                product?.categoryNameUz,
-                product?.category?.nameUz,
-                product?.groupNameUz
-              ),
-
-            nameRu:
-              firstDefined(
-                product?.categoryNameRu,
-                product?.category?.nameRu,
-                product?.groupNameRu
-              ),
-
-            nameEn:
-              firstDefined(
-                product?.categoryNameEn,
-                product?.category?.nameEn,
-                product?.groupNameEn
-              ),
-          },
-          {
-            baseFields: [
-              "name",
-            ],
-
-            fallback:
-              "Boshqa",
-          }
-        );
-
-      normalized.push({
-        deleverId:
-          id,
-
-        deleverCategoryId:
-          catId,
-
-        deleverRestaurantId:
-          restaurantId,
-
-        externalCode:
-          cleanText(
-            firstDefined(
-              product?.code,
-              product?.article,
-              product?.sku,
-              product?.externalCode
-            )
-          ),
-
-        title,
-
-        category:
-          categoryTitle,
-
-        description,
-
-        price,
-
-        image:
-          extractImage(
-            product
-          ),
-
-        isAvailable:
-          explicitAvailability(
-            product
-          ),
-
-        modifierGroups:
-          extractModifierGroups(
-            product
-          ),
-
-        sortOrder:
-          Number(
-            category?.sortOrder ||
-            0
-          ) *
-            10000 +
-          extractSortOrder(
-            product,
-            index
-          ),
-
-        deleverUpdatedAt:
-          safeDate(
-            firstDefined(
-              product?.updatedAt,
-              product?.modifiedAt,
-              product?.lastChange
-            )
-          ),
-
-        deleverRaw:
-          product,
+    if (!id || price === null || price < 0) {
+      skipped.push({
+        id,
+        reason: !id ? "ID topilmadi" : "Narx topilmadi",
+        raw: product,
       });
+      return;
     }
+
+    const catId = categoryId(product);
+    const category = categoryMap.get(catId);
+
+    const title = localizedEntityText(product, {
+      baseFields: ["name", "title", "label"],
+      translationFields: [
+        "nameTranslations",
+        "titleTranslations",
+        "labelTranslations",
+      ],
+      fallback: `Taom ${id}`,
+    });
+
+    const description = localizedEntityText(product, {
+      baseFields: ["description", "desc", "comment"],
+      translationFields: [
+        "descriptionTranslations",
+        "descTranslations",
+        "commentTranslations",
+      ],
+      fallback: "",
+    });
+
+    const categoryTitle =
+      category?.title ||
+      localizedEntityText(
+        {
+          name: firstDefined(
+            product?.categoryName,
+            product?.category?.name,
+            product?.groupName
+          ),
+          nameTranslations: firstDefined(
+            product?.categoryNameTranslations,
+            product?.category?.nameTranslations,
+            product?.groupNameTranslations
+          ),
+          nameUz: firstDefined(
+            product?.categoryNameUz,
+            product?.category?.nameUz,
+            product?.groupNameUz
+          ),
+          nameRu: firstDefined(
+            product?.categoryNameRu,
+            product?.category?.nameRu,
+            product?.groupNameRu
+          ),
+          nameEn: firstDefined(
+            product?.categoryNameEn,
+            product?.category?.nameEn,
+            product?.groupNameEn
+          ),
+        },
+        {
+          baseFields: ["name"],
+          translationFields: ["nameTranslations"],
+          fallback: "Boshqa",
+        }
+      );
+
+    normalized.push({
+      deleverId: id,
+      deleverCategoryId: catId,
+      deleverRestaurantId: restaurantId,
+      externalCode: cleanText(
+        firstDefined(
+          product?.code,
+          product?.article,
+          product?.sku,
+          product?.externalCode
+        )
+      ),
+      title,
+      category: categoryTitle,
+      description,
+      price,
+      image: extractImage(product),
+      isAvailable: explicitAvailability(product),
+      modifierGroups: extractModifierGroups(product),
+      sortOrder:
+        Number(category?.sortOrder || 0) * 10000 +
+        extractSortOrder(product, index),
+      deleverUpdatedAt: safeDate(
+        firstDefined(
+          product?.updatedAt,
+          product?.modifiedAt,
+          product?.lastChange
+        )
+      ),
+      deleverRaw: product,
+    });
+  });
+
+  const lastChange = cleanText(
+    firstDefined(
+      payload?.lastChange,
+      payload?.last_change,
+      payload?.updatedAt,
+      payload?.data?.lastChange,
+      payload?.data?.last_change,
+      payload?.data?.updatedAt,
+      payload?.result?.lastChange,
+      payload?.result?.last_change,
+      payload?.result?.updatedAt
+    )
   );
 
-  const lastChange =
-    cleanText(
-      firstDefined(
-        payload?.lastChange,
-        payload?.last_change,
-        payload?.updatedAt,
-
-        payload?.data?.lastChange,
-        payload?.data?.last_change,
-        payload?.data?.updatedAt,
-
-        payload?.result?.lastChange,
-        payload?.result?.last_change,
-        payload?.result?.updatedAt
-      )
-    );
-
   return {
-    categories: [
-      ...categoryMap.values(),
-    ],
-
-    products:
-      normalized,
-
+    categories: [...categoryMap.values()],
+    products: normalized,
     skipped,
-
     lastChange,
   };
 };
 
-const availabilityCollections = (
-  payload
-) => ({
-  items:
-    firstArrayAt(
-      payload || {},
-      [
-        "items",
-        "products",
-        "dishes",
-        "availability",
-
-        "data.items",
-        "data.products",
-        "data.dishes",
-        "data.availability",
-
-        "result.items",
-        "result.products",
-        "result.dishes",
-        "result.availability",
-      ]
-    ),
-
-  modifiers:
-    firstArrayAt(
-      payload || {},
-      [
-        "modifiers",
-        "modifierItems",
-        "modifications",
-
-        "data.modifiers",
-        "data.modifierItems",
-        "data.modifications",
-
-        "result.modifiers",
-        "result.modifierItems",
-        "result.modifications",
-      ]
-    ),
+const availabilityCollections = (payload) => ({
+  items: firstArrayAt(payload || {}, [
+    "items",
+    "products",
+    "dishes",
+    "availability",
+    "data.items",
+    "data.products",
+    "data.dishes",
+    "data.availability",
+    "result.items",
+    "result.products",
+    "result.dishes",
+    "result.availability",
+  ]),
+  modifiers: firstArrayAt(payload || {}, [
+    "modifiers",
+    "modifierItems",
+    "modifications",
+    "data.modifiers",
+    "data.modifierItems",
+    "data.modifications",
+    "result.modifiers",
+    "result.modifierItems",
+    "result.modifications",
+  ]),
 });
 
-const availabilityValue = (
-  entry
-) => {
-  const bool =
-    firstDefined(
-      entry?.isAvailable,
-      entry?.available,
-      entry?.enabled,
-      entry?.active
-    );
+const availabilityValue = (entry) => {
+  const bool = firstDefined(
+    entry?.isAvailable,
+    entry?.available,
+    entry?.enabled,
+    entry?.active
+  );
 
-  if (
-    typeof bool === "boolean"
-  ) {
-    return bool;
-  }
+  if (typeof bool === "boolean") return bool;
 
   if (
     entry?.isStop === true ||
@@ -1096,33 +724,24 @@ const availabilityValue = (
     return false;
   }
 
-  const stock =
-    numeric(
-      firstDefined(
-        entry?.stock,
-        entry?.balance,
-        entry?.quantity,
-        entry?.remaining
-      )
-    );
+  const stock = numeric(
+    firstDefined(
+      entry?.stock,
+      entry?.balance,
+      entry?.quantity,
+      entry?.remaining
+    )
+  );
 
-  if (stock !== null) {
-    return stock > 0;
-  }
-
-  return false;
+  return stock === null ? false : stock > 0;
 };
 
-const availabilityId = (
-  entry,
-  type
-) =>
+const availabilityId = (entry, type) =>
   cleanText(
     firstDefined(
       type === "modifier"
         ? entry?.modifierId
         : entry?.itemId,
-
       entry?.productId,
       entry?.id,
       entry?.guid,
@@ -1131,7 +750,6 @@ const availabilityId = (
   );
 
 module.exports = {
-  localizedText,
   localizedEntityText,
   normalizeComposition,
   availabilityCollections,

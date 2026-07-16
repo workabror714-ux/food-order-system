@@ -1093,121 +1093,290 @@ svg.lucide { vertical-align: middle; flex-shrink: 0; }
 }
 .banner-media-hint svg { color: var(--g); flex-shrink: 0; margin-top: 1px; }
 
-
-/* ─── DELEVER MENU SYNC ───────────────────────────────────── */
-.delever-sync-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  background: linear-gradient(135deg, #f0f8f3 0%, #ffffff 72%);
-  border-color: rgba(26, 92, 48, 0.18);
-  border-top-color: var(--g);
+/* ===== Delever sync + manual translation admin ===== */
+.delever-tools-panel {
+  border: 1px solid rgba(24, 121, 68, 0.22);
+  background: linear-gradient(135deg, #f5fff8 0%, #ffffff 100%);
 }
 
-.delever-sync-copy {
+.delever-tools-head {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  min-width: 0;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
 }
 
-.delever-sync-icon {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 13px;
-  background: var(--g);
-  color: #fff;
-  box-shadow: 0 6px 16px rgba(26, 92, 48, 0.22);
-}
-
-.delever-sync-title {
-  margin: 0 0 4px;
-  color: var(--g4);
-  font-size: 1rem;
-  font-weight: 850;
-}
-
-.delever-sync-description {
-  margin: 0;
+.delever-tools-note {
+  margin: 6px 0 0;
   max-width: 720px;
-  color: var(--gray);
-  font-size: 0.82rem;
+  color: var(--muted, #667085);
+  font-size: 0.9rem;
   line-height: 1.55;
 }
 
-.delever-sync-btn {
-  min-height: 42px;
+.delever-tools-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sync-result-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
+  color: #067647;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.category-manager {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border, #e4e7ec);
+}
+
+.category-manager > h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.category-manager > p {
+  margin: 0 0 14px;
+  color: var(--muted, #667085);
+  font-size: 0.86rem;
+}
+
+.category-manager-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.category-manager-card {
+  border: 1px solid var(--border, #e4e7ec);
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+}
+
+.category-manager-card > div {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-language-label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border: none;
-  border-radius: 11px;
-  padding: 10px 16px;
-  background: var(--g);
-  color: #fff;
-  font-family: 'Outfit', sans-serif;
-  font-size: 0.84rem;
+  min-width: 30px;
+  height: 24px;
+  border-radius: 7px;
+  background: #f2f4f7;
+  color: #475467;
+  font-size: 0.68rem;
   font-weight: 800;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow: 0 4px 13px rgba(26, 92, 48, 0.24);
-  transition: transform 0.18s, background 0.18s, opacity 0.18s;
 }
 
-.delever-sync-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  background: var(--g2);
+.category-manager-card strong {
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
 }
 
-.delever-sync-btn:disabled {
-  cursor: wait;
-  opacity: 0.68;
+.category-edit-form {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid #b7e4c7;
+  background: #f7fff9;
 }
 
-.delever-sync-notice {
-  grid-column: 1 / -1;
+.category-edit-form h4 {
+  margin: 0 0 14px;
+}
+
+.delever-edit-warning {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #fedf89;
+  background: #fffaeb;
+  color: #7a2e0e;
+}
+
+.delever-edit-warning span {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.language-tabs {
   display: flex;
-  align-items: flex-start;
   gap: 8px;
-  border-radius: 11px;
-  padding: 10px 12px;
-  font-size: 0.8rem;
-  font-weight: 700;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.readonly-source-box {
+  display: grid;
+  gap: 4px;
+  padding: 13px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border, #e4e7ec);
+  background: #f9fafb;
+}
+
+.readonly-source-box strong {
+  font-size: 0.95rem;
+}
+
+.readonly-source-box span,
+.readonly-source-box small {
+  color: #667085;
+}
+
+.readonly-source-box small {
+  margin-top: 4px;
   line-height: 1.45;
 }
 
-.delever-sync-notice.success {
-  background: #dcfce7;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+.new-category-box {
+  background: var(--g3, #f5f8f6);
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 12px;
 }
 
-.delever-sync-notice.error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+.new-category-box > p {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0 0 10px;
 }
 
-.spin-icon {
-  animation: delever-spin 0.85s linear infinite;
+.upload-success-box {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #d1fae5;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-@keyframes delever-spin {
-  to { transform: rotate(360deg); }
+.upload-success-box span {
+  font-size: 0.85rem;
+  color: #065f46;
+  font-weight: 700;
 }
 
-@media (max-width: 720px) {
-  .delever-sync-card {
+.upload-success-box button {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: #e53e3e;
+}
+
+.form-help-success,
+.form-help-danger {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.form-help-success {
+  color: var(--g, #187944);
+}
+
+.form-help-danger {
+  color: #e53e3e;
+}
+
+.food-form-preview {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 2px solid var(--border, #e4e7ec);
+  margin-top: 10px;
+}
+
+.food-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.food-list-header .section-title {
+  margin-bottom: 0;
+}
+
+.admin-search-input {
+  width: min(100%, 340px);
+  padding: 11px 13px;
+  border: 1px solid var(--border, #d0d5dd);
+  border-radius: 11px;
+  outline: none;
+  background: #fff;
+}
+
+.admin-search-input:focus {
+  border-color: #187944;
+  box-shadow: 0 0 0 3px rgba(24, 121, 68, 0.1);
+}
+
+.food-source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.source-badge.delever {
+  background: #eef4ff;
+  color: #3538cd;
+}
+
+.source-badge.local {
+  background: #f2f4f7;
+  color: #475467;
+}
+
+@media (max-width: 640px) {
+  .delever-tools-actions,
+  .delever-tools-actions button {
+    width: 100%;
+  }
+
+  .category-manager-grid {
     grid-template-columns: 1fr;
   }
 
-  .delever-sync-btn {
+  .admin-search-input {
     width: 100%;
   }
 }

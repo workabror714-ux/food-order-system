@@ -101,6 +101,62 @@ const publicMenuFilter =
   });
 
 router.get(
+  "/api/admin/foods",
+  auth,
+  async (req, res) => {
+    try {
+      const limit = Math.min(
+        1000,
+        Math.max(1, Number(req.query.limit) || 500)
+      );
+
+      const foods = await Food.find({
+        isDeletedInSource: { $ne: true },
+      })
+        .select(
+          [
+            "title",
+            "category",
+            "description",
+            "price",
+            "deleverBasePrice",
+            "packagingFee",
+            "image",
+            "isAvailable",
+            "source",
+            "deleverId",
+            "deleverCategoryId",
+            "deleverRestaurantId",
+            "modifierGroups",
+            "translatedModifierGroups",
+            "sortOrder",
+            "translationManual",
+            "manualTranslationUpdatedAt",
+            "lastSyncedAt",
+          ].join(" ")
+        )
+        .sort({
+          sortOrder: 1,
+          createdAt: -1,
+        })
+        .limit(limit)
+        .lean();
+
+      return res.json({
+        success: true,
+        total: foods.length,
+        foods,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+
+router.get(
   "/api/foods",
   async (req, res) => {
     try {

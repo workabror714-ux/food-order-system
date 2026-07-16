@@ -9,6 +9,7 @@ const {
   getRestaurants,
   getMenuComposition,
   getMenuAvailability,
+  createOrder,
 } = require("../integrations/delever");
 const { syncDeleverMenu } = require("../services/deleverMenuSync");
 const {
@@ -16,6 +17,16 @@ const {
   retryPendingDeleverOrders,
   refreshDeleverOrderStatus,
 } = require("../services/deleverOrderSync");
+
+const {
+  buildDeleverOrderPayload,
+  extractDeleverOrderId,
+} = require("../lib/deleverOrderMapper");
+
+const envTrue = (name) =>
+  String(process.env[name] || "")
+    .trim()
+    .toLowerCase() === "true";
 
 router.get("/api/admin/delever/status", auth, superAdmin, async (req, res) => {
   try {
@@ -235,6 +246,324 @@ router.post("/api/admin/delever/sync-menu", auth, superAdmin, async (req, res) =
     });
   }
 });
+
+router.post(
+  "/api/admin/delever/test-order",
+  auth,
+  superAdmin,
+  async (req, res) => {
+    let testOrder = null;
+
+    try {
+      /*
+       * Bu endpoint alohida environment orqali himoyalangan.
+       * DELEVER_ORDER_ENABLED=false bo'lib turaveradi.
+       */
+      if (!envTrue("DELEVER_TEST_ORDER_ENABLED")) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Test buyurtma yuborish o'chirilgan. " +
+            "DELEVER_TEST_ORDER_ENABLED=true qiling.",
+        });
+      }
+
+      const {
+        confirm,
+        foodId,
+        quantity = 1,
+        customerName = "Anvar",
+        customerPhone,
+      } = req.body || {};
+
+      /*
+       * Tasodifiy request buyurtma yubormasligi uchun
+       * maxsus tasdiqlash so'zi talab qilinadi.
+       */
+      if (confirm !== "SEND_TEST_ORDER") {
+        return res.status(400).json({
+          success: false,
+          message:
+            'confirm maydoni "SEND_TEST_ORDER" bo‘lishi kerak.',
+        });
+      }
+
+      if (
+        !/^[a-f0-9]{24}$/i.test(
+          String(foodId || "")
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "foodId noto'g'ri.",
+        });
+      }
+
+      const parsedQuantity = Number(quantity);
+
+      if (
+        !Number.isInteger(parsedQuantity) ||
+        parsedQuantity < 1 ||
+        parsedQuantity > 5
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Test uchun quantity 1 dan 5 gacha bo'lishi kerak.",
+        });
+      }
+
+      const phone = String(
+        customerPhone ||
+          process.env.DELEVER_TEST_PHONE ||
+          ""
+      ).trim();
+
+      if (!phone) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "customerPhone yuboring yoki " +
+            "DELEVER_TEST_PHONE kiriting.",
+        });
+      }
+
+      const config = getPublicConfig();
+
+      if (!config.restaurantId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "DELEVER_RESTAURANT_ID kiritilmagan.",
+        });
+      }
+
+      /*
+       * Faqat mavjud va shu restoranga tegishli
+       * Delever taomini olamiz.
+       */
+      const food = await Food.findOne({
+        _id: foodId,
+        source: "delever",
+        deleverRestaurantId:
+          config.restaurantId,
+        deleverId: {
+          $exists: true,
+          $ne: "",
+        },
+        isAvailable: true,
+        isDeletedInSource: {
+          $ne: true,
+        },
+      });
+
+      if (!food) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Mavjud Delever taomi topilmadi. " +
+            "Stop-listda bo'lmagan taom ID sini kiriting.",
+        });
+      }
+
+      const title = String(
+        food.title?.uz ||
+          food.title?.ru ||
+          "Test taom"
+      );
+
+      const price = Number(food.price) || 0;
+
+      if (price <= 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Tanlangan taom narxi noto'g'ri.",
+        });
+      }
+
+      const totalPrice =
+        price * parsedQuantity;
+
+      /*
+       * Test buyurtmani lokal bazada alohida saqlaymiz.
+       *
+       * Telegram va Millenium chaqirilmaydi.
+       */
+      testOrder = await Order.create({
+        customerName:
+          `[TEST] ${String(customerName).trim()}`,
+
+        customerPhone: phone,
+
+        items: [
+          {
+            foodId: String(food._id),
+
+            deleverProductId:
+              String(food.deleverId),
+
+            title,
+
+            price,
+
+            quantity: parsedQuantity,
+
+            modifiers: [],
+          },
+        ],
+
+        totalPrice,
+
+        address:
+          "TEST ORDER — TAYYORLAMANG",
+
+        orderType: "pickup",
+
+        paymentType: "cash",
+
+        paymentProvider: "cash",
+
+        paymentStatus: "unpaid",
+
+        deliveryPrice: 0,
+
+        paymentAmount: totalPrice,
+
+        status: "new",
+
+        deleverSyncStatus: "syncing",
+
+        deleverAttempts: 1,
+
+        deleverLastAttemptAt:
+          new Date(),
+
+        deleverRestaurantId:
+          config.restaurantId,
+      });
+
+      testOrder.deleverExternalId =
+        String(testOrder._id);
+
+      await testOrder.save();
+
+      /*
+       * Neon Alisa uchun payload.
+       */
+      const payload =
+        buildDeleverOrderPayload(testOrder);
+
+      payload.comment =
+        `TEST ORDER — TAYYORLAMANG! ` +
+        String(payload.comment || "");
+
+      /*
+       * Bu joy real Delever buyurtma yaratadi.
+       */
+      const response =
+        await createOrder(payload);
+
+      const deleverOrderId =
+        extractDeleverOrderId(response);
+
+      if (!deleverOrderId) {
+        throw new Error(
+          "Delever javobida orderId topilmadi"
+        );
+      }
+
+      await Order.updateOne(
+        {
+          _id: testOrder._id,
+        },
+        {
+          $set: {
+            deleverOrderId,
+
+            deleverSyncStatus:
+              "success",
+
+            deleverSyncError: "",
+
+            deleverNextRetryAt: null,
+
+            deleverSyncedAt:
+              new Date(),
+
+            deleverRawResponse:
+              response,
+          },
+        }
+      );
+
+      return res.status(201).json({
+        success: true,
+
+        message:
+          "Test buyurtma Deleverga yuborildi.",
+
+        localOrderId:
+          String(testOrder._id),
+
+        deleverOrderId,
+
+        food: {
+          id: String(food._id),
+          deleverId:
+            String(food.deleverId),
+          title,
+          price,
+          quantity: parsedQuantity,
+        },
+
+        response,
+      });
+    } catch (error) {
+      console.error(
+        "Delever test-order xato:",
+        error.message
+      );
+
+      if (testOrder?._id) {
+        await Order.updateOne(
+          {
+            _id: testOrder._id,
+          },
+          {
+            $set: {
+              deleverSyncStatus:
+                "failed",
+
+              deleverSyncError:
+                String(
+                  error.message ||
+                    "Delever test xatosi"
+                ).slice(0, 1000),
+
+              deleverRawResponse:
+                error.response || null,
+            },
+          }
+        ).catch(() => {});
+      }
+
+      return res
+        .status(error.status || 502)
+        .json({
+          success: false,
+          message: error.message,
+          response:
+            error.response || null,
+
+          localOrderId:
+            testOrder?._id
+              ? String(testOrder._id)
+              : null,
+        });
+    }
+  }
+);
 
 router.post("/api/admin/delever/orders/retry", auth, superAdmin, async (req, res) => {
   try {

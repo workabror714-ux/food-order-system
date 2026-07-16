@@ -23,12 +23,29 @@ const fulfillAcceptedOrder = async (order) => {
     result.order = order;
   }
 
-  try {
-    await dispatchMilleniumOrder(result.order);
-    result.millenium = { success: true };
-  } catch (error) {
-    console.error("Millenium fulfillment xato:", error.message);
-    result.millenium = { success: false, error: error.message };
+  if (result.order.orderType === "delivery") {
+    try {
+      await dispatchMilleniumOrder(result.order);
+  
+      result.millenium = {
+        success: true,
+      };
+    } catch (error) {
+      console.error(
+        "Millenium fulfillment xato:",
+        error.message
+      );
+  
+      result.millenium = {
+        success: false,
+        error: error.message,
+      };
+    }
+  } else {
+    result.millenium = {
+      skipped: true,
+      reason: "pickup_order",
+    };
   }
 
   try {

@@ -7,9 +7,21 @@ const boolEnv = (name, fallback) => {
 };
 
 const normalizePhone = (value) => {
-  const raw = String(value || "").trim();
-  const digits = raw.replace(/[^0-9]/g, "");
-  if (!digits) return raw;
+  const digits = String(value || "")
+    .replace(/[^0-9]/g, "");
+
+  if (!digits) return "";
+
+  // 90 123 45 67 kabi 9 xonali raqam
+  if (digits.length === 9) {
+    return `+998${digits}`;
+  }
+
+  // 998901234567
+  if (digits.startsWith("998")) {
+    return `+${digits}`;
+  }
+
   return `+${digits}`;
 };
 
@@ -85,7 +97,12 @@ const buildDeleverOrderPayload = (order) => {
     items,
     paymentInfo: {
       itemsCost: Number(order.totalPrice) || 0,
-      deliveryCost: Number(order.deliveryPrice) || 0,
+      deliveryCost: boolEnv(
+        "DELEVER_SEND_DELIVERY_COST",
+        false
+      )
+        ? Number(order.deliveryPrice) || 0
+        : 0,
       paymentType: paymentTypeForDelever(order),
       isPaid: order.paymentType === "cash" ? false : order.paymentStatus === "paid",
     },

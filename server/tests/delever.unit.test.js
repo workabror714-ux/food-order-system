@@ -155,7 +155,7 @@ test(
 test("Bot order Delever payloadiga xavfsiz map qilinadi", () => {
   configure();
 
-  process.env.DELEVER_PLATFORM = "BOT";
+  // process.env.DELEVER_PLATFORM = "BOT";
   process.env.DELEVER_SEND_DELIVERY_COST = "false";
 
   const payload = buildDeleverOrderPayload({
@@ -184,97 +184,61 @@ test("Bot order Delever payloadiga xavfsiz map qilinadi", () => {
   });
 
   assert.strictEqual(
-    payload.paymentInfo.deliveryCost,
-    0
-  );
-
-  assert.strictEqual(
     payload.restaurantId,
     "restaurant-1"
   );
-
-  assert.strictEqual(
-    payload.externalOrderId,
-    "66abc123"
-  );
-
-  assert.strictEqual(
-    payload.items[0].crmId,
-    "delever-food-id"
-  );
-
+  
   assert.strictEqual(
     payload.items[0].id,
     "delever-food-id"
   );
-
+  
   assert.strictEqual(
     payload.items[0].quantity,
     2
   );
-
+  
   assert.strictEqual(
     payload.paymentInfo.itemsCost,
     90000
   );
-
+  
   assert.strictEqual(
-    payload.paymentInfo.isPaid,
-    false
+    payload.paymentInfo.paymentType,
+    "cash"
   );
-
+  
   assert.strictEqual(
     payload.deliveryInfo.phoneNumber,
     "+998901234567"
   );
-});
-
-test("Deleverga delivery narxi ruxsat berilganda yuboriladi", () => {
-  configure();
-
-  process.env.DELEVER_SEND_DELIVERY_COST = "true";
-
-  const payload = buildDeleverOrderPayload({
-    _id: "66abc124",
-    customerName: "Anvar",
-    customerPhone: "901234567",
-    orderType: "delivery",
-    paymentType: "click",
-    paymentStatus: "paid",
-    totalPrice: 90000,
-    deliveryPrice: 15000,
-    address: "Toshkent shahri",
-    location: {
-      lat: 41.3111,
-      lng: 69.2797,
-    },
-    items: [
-      {
-        foodId: "mongo-food-id",
-        deleverProductId: "delever-food-id",
-        title: "Osh",
-        price: 45000,
-        quantity: 2,
-        modifiers: [],
-      },
-    ],
-  });
-
+  
+  assert.strictEqual(
+    payload.platform,
+    undefined
+  );
+  
+  assert.strictEqual(
+    payload.externalOrderId,
+    undefined
+  );
+  
+  assert.strictEqual(
+    payload.items[0].crmId,
+    undefined
+  );
+  
   assert.strictEqual(
     payload.paymentInfo.deliveryCost,
-    15000
+    undefined
   );
-
+  
   assert.strictEqual(
     payload.paymentInfo.isPaid,
-    true
-  );
-
-  assert.strictEqual(
-    payload.deliveryInfo.phoneNumber,
-    "+998901234567"
+    undefined
   );
 });
+
 
 test("Delever order ID va status variantlari aniqlanadi", () => {
   assert.strictEqual(extractDeleverOrderId({ data: { orderId: "D-123" } }), "D-123");

@@ -199,6 +199,11 @@ test("Bot order Delever payloadiga xavfsiz map qilinadi", () => {
   );
 
   assert.strictEqual(
+    payload.items[0].crmId,
+    "delever-food-id"
+  );
+
+  assert.strictEqual(
     payload.items[0].id,
     "delever-food-id"
   );

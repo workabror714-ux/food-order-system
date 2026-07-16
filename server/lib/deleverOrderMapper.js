@@ -40,15 +40,36 @@ const modifierId = (modifier) => String(
   modifier?.deleverModifierId || modifier?.modifierId || modifier?.id || ""
 ).trim();
 
-const mapModifiers = (modifiers = []) => modifiers
-  .filter(Boolean)
-  .map(modifier => ({
-    id: modifierId(modifier),
-    name: String(modifier.name || modifier.title || ""),
-    price: Number(modifier.price) || 0,
-    quantity: Math.max(1, Math.floor(Number(modifier.quantity) || 1)),
-  }))
-  .filter(modifier => modifier.id);
+const mapModifiers = (modifiers = []) =>
+  modifiers
+    .filter(Boolean)
+    .map((modifier) => {
+      const crmId = modifierId(modifier);
+
+      return {
+        // Delever/CRM uchun asosiy identifikator
+        crmId,
+        // Eski format bilan moslik uchun qoldiramiz
+        id: crmId,
+
+        name: String(
+          modifier.name ||
+          modifier.title ||
+          ""
+        ),
+
+        price:
+          Number(modifier.price) || 0,
+
+        quantity: Math.max(
+          1,
+          Math.floor(
+            Number(modifier.quantity) || 1
+          )
+        ),
+      };
+    })
+    .filter((modifier) => modifier.crmId);
 
 const getRestaurantIdForOrder = (order) => String(
   order.deleverRestaurantId || process.env.DELEVER_RESTAURANT_ID || ""
@@ -66,13 +87,47 @@ const buildDeleverOrderPayload = (order) => {
     throw new Error(`Delever ID biriktirilmagan taomlar: ${names}. Avval menyuni sinxronlashtiring.`);
   }
 
-  const items = (order.items || []).map(item => ({
-    id: String(item.deleverProductId || item.foodId || ""),
-    name: String(item.title || "Taom"),
-    price: Number(item.price) || 0,
-    quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
-    modifications: mapModifiers(item.modifiers || []),
-  }));
+  const items = (order.items || []).map(
+    (item) => {
+      const crmId = String(
+        item.deleverProductId ||
+        item.foodId ||
+        ""
+      ).trim();
+  
+      if (!crmId) {
+        throw new Error(
+          `${item.title || "Taom"} uchun crmId topilmadi`
+        );
+      }
+  
+      return {
+        // Delever aynan crmId yoki crmField talab qilmoqda
+        crmId,
+  
+        // Eski format bilan moslik uchun qoldiramiz
+        id: crmId,
+  
+        name: String(
+          item.title || "Taom"
+        ),
+  
+        price:
+          Number(item.price) || 0,
+  
+        quantity: Math.max(
+          1,
+          Math.floor(
+            Number(item.quantity) || 1
+          )
+        ),
+  
+        modifications: mapModifiers(
+          item.modifiers || []
+        ),
+      };
+    }
+  );
 
   const externalId = String(order._id);
   const arrivalMinutes = Math.max(0, Number(process.env.DELEVER_ARRIVAL_MINUTES) || 0);

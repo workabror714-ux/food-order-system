@@ -73,13 +73,55 @@ export default function Menu() {
       cachedGet("/api/foods"),
       cachedGet("/api/banners").catch(() => []),
     ]).then(([fd, bd]) => {
-      const arr = Array.isArray(fd) ? fd : [];
+      const rawFoods = Array.isArray(fd) ? fd : [];
+
+      const deleverFoods = rawFoods.filter(
+        (food) =>
+          food?.source === "delever" &&
+          food?.deleverId
+      );
+
+      /*
+       * Bir xil deleverCategoryId ichidagi barcha itemlarga
+       * bitta canonical kategoriya obyektini beramiz.
+       * Bu "Салаты / САЛАТЫ" kabi takrorlarni yo'qotadi.
+       */
+      const categoryById = new Map();
+
+      deleverFoods.forEach((food) => {
+        if (
+          food.deleverCategoryId &&
+          !categoryById.has(food.deleverCategoryId)
+        ) {
+          categoryById.set(
+            food.deleverCategoryId,
+            food.category
+          );
+        }
+      });
+
+      const arr = deleverFoods.map((food) => ({
+        ...food,
+        category:
+          categoryById.get(
+            food.deleverCategoryId
+          ) || food.category,
+      }));
+
       setFoods(arr);
+
       if (arr.length > 0) {
-        const initialCategories = sortCategories([...new Map(arr.map(f => {
-          const key = typeof f.category === "object" ? f.category.uz : f.category;
-          return [key, f.category];
-        })).values()]);
+        const initialCategories = sortCategories([
+          ...new Map(
+            arr.map((food) => [
+              food.deleverCategoryId ||
+                (typeof food.category === "object"
+                  ? food.category.uz
+                  : food.category),
+              food.category,
+            ])
+          ).values(),
+        ]);
         const first = urlCat || (initialCategories[0] && getCatKey(initialCategories[0]));
         setActiveCategory(first);
         if (urlCat) setTimeout(() => {
@@ -106,10 +148,17 @@ export default function Menu() {
     };
   }, []);
 
-  const categoriesRaw = sortCategories([...new Map(foods.map(f => {
-    const key = typeof f.category === "object" ? f.category.uz : f.category;
-    return [key, f.category];
-  })).values()]);
+  const categoriesRaw = sortCategories([
+    ...new Map(
+      foods.map((food) => [
+        food.deleverCategoryId ||
+          (typeof food.category === "object"
+            ? food.category.uz
+            : food.category),
+        food.category,
+      ])
+    ).values(),
+  ]);
   const getCatDisplay = (cat) => getField(cat, lang);
   const foodsByCategory = categoriesRaw.reduce((acc, cat) => {
     const key = getCatKey(cat);

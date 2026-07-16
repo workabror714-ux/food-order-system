@@ -37,11 +37,17 @@ export default function Admin() {
         data = await api.get("/api/foods");
       }
 
-      setFoods(data);
+      const deleverFoods = data.filter(
+        (food) =>
+          food?.source === "delever" &&
+          food?.deleverId
+      );
+
+      setFoods(deleverFoods);
 
       const categoryMap = new Map();
 
-      data.forEach((food) => {
+      deleverFoods.forEach((food) => {
         const category =
           food.category && typeof food.category === "object"
             ? {
@@ -56,15 +62,21 @@ export default function Admin() {
               };
 
         const key =
-          food.deleverCategoryId ||
-          `${food.source || "local"}:${category.ru || category.uz}`;
+          food.deleverCategoryId;
 
-        if (!key || categoryMap.has(key)) return;
+        if (
+          !key ||
+          categoryMap.has(key)
+        ) {
+          return;
+        }
 
         categoryMap.set(key, {
           ...category,
-          deleverCategoryId: food.deleverCategoryId || "",
-          source: food.source || "local",
+          deleverCategoryId:
+            key,
+          source:
+            "delever",
         });
       });
 

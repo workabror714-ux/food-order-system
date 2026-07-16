@@ -4,6 +4,7 @@ const router =
 
 const {
   auth,
+  superAdmin,
 } = require(
   "../middleware/auth"
 );
@@ -110,9 +111,22 @@ router.get(
         Math.max(1, Number(req.query.limit) || 500)
       );
 
-      const foods = await Food.find({
-        isDeletedInSource: { $ne: true },
-      })
+      const adminFilter = {
+        source: "delever",
+        isDeletedInSource: {
+          $ne: true,
+        },
+      };
+
+      const restaurantId = String(
+        process.env.DELEVER_RESTAURANT_ID || ""
+      ).trim();
+
+      if (restaurantId) {
+        adminFilter.deleverRestaurantId = restaurantId;
+      }
+
+      const foods = await Food.find(adminFilter)
         .select(
           [
             "title",
@@ -156,15 +170,92 @@ router.get(
   }
 );
 
+
+/*
+ * Bir martalik tozalash:
+ * oldin admin paneldan qo'shilgan local taomlarni o'chiradi.
+ * Delever taomlariga tegmaydi.
+ */
+router.post(
+  "/api/admin/foods/delete-local",
+  auth,
+  superAdmin,
+  async (req, res) => {
+    try {
+      if (
+        req.body?.confirm !==
+        "DELETE_LOCAL_FOODS"
+      ) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              'confirm maydoni "DELETE_LOCAL_FOODS" bo‘lishi kerak.',
+          });
+      }
+
+      const result =
+        await Food.deleteMany({
+          $or: [
+            {
+              source:
+                "local",
+            },
+            {
+              source: {
+                $exists:
+                  false,
+              },
+            },
+            {
+              source:
+                null,
+            },
+          ],
+        });
+
+      return res.json({
+        success: true,
+        deletedCount:
+          result.deletedCount ||
+          0,
+        message:
+          `${result.deletedCount || 0} ta lokal taom o‘chirildi.`,
+      });
+    } catch (error) {
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message:
+            error.message,
+        });
+    }
+  }
+);
+
 router.get(
   "/api/foods",
   async (req, res) => {
     try {
       const mode =
-        getMenuSourceMode();
+        "delever";
 
       const filter =
         publicMenuFilter();
+
+      filter.source =
+        "delever";
+
+      const restaurantId = String(
+        process.env.DELEVER_RESTAURANT_ID || ""
+      ).trim();
+
+      if (restaurantId) {
+        filter.deleverRestaurantId =
+          restaurantId;
+      }
 
       if (
         mode === "local"
@@ -267,6 +358,21 @@ router.get(
             req.params.id,
 
           ...publicMenuFilter(),
+
+          source:
+            "delever",
+
+          ...(String(
+            process.env.DELEVER_RESTAURANT_ID ||
+              ""
+          ).trim()
+            ? {
+                deleverRestaurantId:
+                  String(
+                    process.env.DELEVER_RESTAURANT_ID
+                  ).trim(),
+              }
+            : {}),
         });
 
       if (!food) {
@@ -297,6 +403,18 @@ router.post(
   auth,
   async (req, res) => {
     try {
+      if (
+        getMenuSourceMode() ===
+        "delever"
+      ) {
+        return res
+          .status(409)
+          .json({
+            message:
+              "Yangi taomni Delever/Neon Alisa ichida qo‘shing va sinxronlash tugmasini bosing.",
+          });
+      }
+
       const {
         title_uz,
         title_ru,

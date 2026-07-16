@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { api } from "../api";
+import { api, invalidateCache } from "../api";
 import {
   compressImage,
   uploadToServer,
@@ -63,6 +63,7 @@ export default function FoodsTab({
 
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
+  const [cleaningLocal, setCleaningLocal] = useState(false);
 
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -74,10 +75,16 @@ export default function FoodsTab({
   const isDeleverEdit = editingFood?.source === "delever";
 
   const visibleFoods = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return foods;
+    const deleverFoods = foods.filter(
+      (food) =>
+        food?.source === "delever" &&
+        food?.deleverId
+    );
 
-    return foods.filter((food) => {
+    const query = search.trim().toLowerCase();
+    if (!query) return deleverFoods;
+
+    return deleverFoods.filter((food) => {
       const haystack = [
         getField(food.title, "uz"),
         getField(food.title, "ru"),
@@ -171,6 +178,13 @@ export default function FoodsTab({
   const handleFoodSubmit = async (event) => {
     event.preventDefault();
 
+    if (!isDeleverEdit) {
+      alert(
+        "Yangi taom Delever/Neon Alisa ichida qo‘shiladi. Keyin sinxronlash tugmasini bosing."
+      );
+      return;
+    }
+
     if (!titles.uz.trim()) {
       alert("O'zbek tili nomini kiriting!");
       return;
@@ -245,6 +259,7 @@ export default function FoodsTab({
       }
 
       alert(editId ? "Yangilandi!" : "Qo'shildi!");
+      invalidateCache("/api/foods");
       resetForm();
       await refetch();
     } catch (error) {
@@ -358,6 +373,46 @@ export default function FoodsTab({
     }
   };
 
+
+  const deleteLocalFoods = async () => {
+    const approved = window.confirm(
+      "Oldin admin paneldan qo‘shilgan barcha LOCAL taomlar o‘chiriladi. Delever taomlariga tegilmaydi. Davom etamizmi?"
+    );
+
+    if (!approved) {
+      return;
+    }
+
+    setCleaningLocal(true);
+    setSyncMessage("");
+
+    try {
+      const response = await api.post(
+        "/api/admin/foods/delete-local",
+        {
+          confirm:
+            "DELETE_LOCAL_FOODS",
+        },
+        true
+      );
+
+      invalidateCache();
+
+      setSyncMessage(
+        `✅ ${response.deletedCount || 0} ta lokal taom o‘chirildi. Endi faqat Delever menyusi ishlaydi.`
+      );
+
+      resetForm();
+      await refetch();
+    } catch (error) {
+      setSyncMessage(
+        `❌ ${error.message}`
+      );
+    } finally {
+      setCleaningLocal(false);
+    }
+  };
+
   const startCategoryEdit = (category) => {
     setEditingCategory(category);
     setCategoryDraft({
@@ -431,6 +486,22 @@ export default function FoodsTab({
               >
                 <AppIcon name="refresh" size={16} />
                 {syncing ? "Sinxronlanmoqda..." : "Delever bilan sinxronlash"}
+              </button>
+
+              <button
+                type="button"
+                className="btn-delete"
+                style={{
+                  flex: "none",
+                  padding: "11px 20px",
+                }}
+                onClick={deleteLocalFoods}
+                disabled={cleaningLocal}
+              >
+                <AppIcon name="trash" size={16} />
+                {cleaningLocal
+                  ? "Tozalanmoqda..."
+                  : "Lokal taomlarni o‘chirish"}
               </button>
 
               <button
@@ -907,7 +978,7 @@ export default function FoodsTab({
       <div className="admin-section">
         <div className="food-list-header">
           <h2 className="section-title">
-            <AppIcon name="list" size={18} /> Mavjud taomlar ({foods.length})
+            <AppIcon name="list" size={18} /> Delever taomlari ({visibleFoods.length})
           </h2>
           <input
             className="admin-search-input"

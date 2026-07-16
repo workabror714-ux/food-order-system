@@ -43,33 +43,26 @@ const modifierId = (modifier) => String(
 const mapModifiers = (modifiers = []) =>
   modifiers
     .filter(Boolean)
-    .map((modifier) => {
-      const crmId = modifierId(modifier);
+    .map((modifier) => ({
+      id: modifierId(modifier),
 
-      return {
-        // Delever/CRM uchun asosiy identifikator
-        crmId,
-        // Eski format bilan moslik uchun qoldiramiz
-        id: crmId,
+      name: String(
+        modifier.name ||
+        modifier.title ||
+        ""
+      ),
 
-        name: String(
-          modifier.name ||
-          modifier.title ||
-          ""
-        ),
+      price:
+        Number(modifier.price) || 0,
 
-        price:
-          Number(modifier.price) || 0,
-
-        quantity: Math.max(
-          1,
-          Math.floor(
-            Number(modifier.quantity) || 1
-          )
-        ),
-      };
-    })
-    .filter((modifier) => modifier.crmId);
+      quantity: Math.max(
+        1,
+        Math.floor(
+          Number(modifier.quantity) || 1
+        )
+      ),
+    }))
+    .filter((modifier) => modifier.id);
 
 const getRestaurantIdForOrder = (order) => String(
   order.deleverRestaurantId || process.env.DELEVER_RESTAURANT_ID || ""
@@ -77,51 +70,85 @@ const getRestaurantIdForOrder = (order) => String(
 
 const buildDeleverOrderPayload = (order) => {
   const config = getConfig();
-  const restaurantId = getRestaurantIdForOrder(order) || config.restaurantId;
-  if (!restaurantId) throw new Error("Delever Restaurant ID topilmadi");
 
-  const requireExternalItems = boolEnv("DELEVER_REQUIRE_EXTERNAL_ITEMS", true);
-  const missing = (order.items || []).filter(item => !String(item.deleverProductId || "").trim());
-  if (requireExternalItems && missing.length) {
-    const names = missing.map(item => item.title || item.foodId).join(", ");
-    throw new Error(`Delever ID biriktirilmagan taomlar: ${names}. Avval menyuni sinxronlashtiring.`);
+  const restaurantId =
+    getRestaurantIdForOrder(order) ||
+    config.restaurantId;
+
+  if (!restaurantId) {
+    throw new Error(
+      "Delever Restaurant ID topilmadi"
+    );
   }
 
+  const requireExternalItems = boolEnv(
+    "DELEVER_REQUIRE_EXTERNAL_ITEMS",
+    true
+  );
+
+  const missing = (order.items || []).filter(
+    (item) =>
+      !String(
+        item.deleverProductId || ""
+      ).trim()
+  );
+
+  if (
+    requireExternalItems &&
+    missing.length
+  ) {
+    const names = missing
+      .map(
+        (item) =>
+          item.title ||
+          item.foodId ||
+          "Noma'lum taom"
+      )
+      .join(", ");
+
+    throw new Error(
+      `Delever ID biriktirilmagan taomlar: ${names}. ` +
+      "Avval menyuni sinxronlashtiring."
+    );
+  }
+
+  /*
+   * Delever rasmiy formatida mahsulot identifikatori:
+   * items[].id
+   */
   const items = (order.items || []).map(
     (item) => {
-      const crmId = String(
+      const id = String(
         item.deleverProductId ||
         item.foodId ||
         ""
       ).trim();
-  
-      if (!crmId) {
+
+      if (!id) {
         throw new Error(
-          `${item.title || "Taom"} uchun crmId topilmadi`
+          `${item.title || "Taom"} uchun Delever ID topilmadi`
         );
       }
-  
+
+      const quantity = Math.max(
+        1,
+        Math.floor(
+          Number(item.quantity) || 1
+        )
+      );
+
       return {
-        // Delever aynan crmId yoki crmField talab qilmoqda
-        crmId,
-  
-        // Eski format bilan moslik uchun qoldiramiz
-        id: crmId,
-  
+        id,
+
         name: String(
           item.title || "Taom"
         ),
-  
+
         price:
           Number(item.price) || 0,
-  
-        quantity: Math.max(
-          1,
-          Math.floor(
-            Number(item.quantity) || 1
-          )
-        ),
-  
+
+        quantity,
+
         modifications: mapModifiers(
           item.modifiers || []
         ),
@@ -129,45 +156,86 @@ const buildDeleverOrderPayload = (order) => {
     }
   );
 
-  const externalId = String(order._id);
-  const arrivalMinutes = Math.max(0, Number(process.env.DELEVER_ARRIVAL_MINUTES) || 0);
-  const arrivalDate = arrivalMinutes ? new Date(Date.now() + arrivalMinutes * 60 * 1000).toISOString() : undefined;
-
-  const deliveryInfo = {
-    clientName: String(order.customerName || ""),
-    phoneNumber: normalizePhone(order.customerPhone),
-    orderType: orderTypeForDelever(order),
-  };
-  if (order.address) deliveryInfo.address = String(order.address);
-  if (order.location?.lat !== undefined && order.location?.lng !== undefined) {
-    deliveryInfo.latitude = Number(order.location.lat);
-    deliveryInfo.longitude = Number(order.location.lng);
+  if (!items.length) {
+    throw new Error(
+      "Delever buyurtmasida taomlar yo'q"
+    );
   }
-  if (arrivalDate) deliveryInfo.courierArrivementDate = arrivalDate;
 
-  const payload = {
-    externalOrderId: externalId,
-    comment: `Telegram Web App buyurtmasi #${externalId}`,
+  const externalId = String(
+    order._id || ""
+  );
+
+  const arrivalMinutes = Math.max(
+    0,
+    Number(
+      process.env
+        .DELEVER_ARRIVAL_MINUTES
+    ) || 0
+  );
+
+  const arrivalDate = arrivalMinutes
+    ? new Date(
+        Date.now() +
+        arrivalMinutes * 60 * 1000
+      ).toISOString()
+    : null;
+
+  /*
+   * Hozircha faqat rasmiy hujjatda ko'rsatilgan
+   * deliveryInfo maydonlarini yuboramiz.
+   */
+  const deliveryInfo = {
+    clientName: String(
+      order.customerName || ""
+    ),
+
+    phoneNumber: normalizePhone(
+      order.customerPhone
+    ),
+  };
+
+  if (arrivalDate) {
+    deliveryInfo.courierArrivementDate =
+      arrivalDate;
+  }
+
+  /*
+   * Minimal, rasmiy Delever payload.
+   *
+   * Hozircha yuborilmaydi:
+   * - platform: BOT
+   * - externalOrderId
+   * - crmId
+   * - crmField
+   * - deliveryCost
+   * - isPaid
+   * - orderType
+   * - latitude/longitude
+   */
+  return {
+    comment:
+      `Telegram Web App buyurtmasi #${externalId}`,
+
     deliveryInfo,
+
     items,
+
     paymentInfo: {
-      itemsCost: Number(order.totalPrice) || 0,
-      deliveryCost: boolEnv(
-        "DELEVER_SEND_DELIVERY_COST",
-        false
-      )
-        ? Number(order.deliveryPrice) || 0
-        : 0,
-      paymentType: paymentTypeForDelever(order),
-      isPaid: order.paymentType === "cash" ? false : order.paymentStatus === "paid",
+      itemsCost:
+        Number(order.totalPrice) || 0,
+
+      paymentType:
+        paymentTypeForDelever(order),
     },
-    persons: Math.max(1, Number(order.persons) || 1),
-    platform: config.platform || "BOT",
+
+    persons: Math.max(
+      1,
+      Number(order.persons) || 1
+    ),
+
     restaurantId,
   };
-
-  if (!boolEnv("DELEVER_INCLUDE_EXTERNAL_ID", true)) delete payload.externalOrderId;
-  return payload;
 };
 
 const extractDeleverOrderId = (response) => {

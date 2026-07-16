@@ -14,23 +14,26 @@ const {
   availabilityId,
 } = require("../lib/deleverMenuMapper");
 
-const {
-  translateDeleverProducts,
-} = require("./deleverAutoTranslation");
-
 const getDeleverItemMarkup = () => {
   const value = Number(
-    process.env.DELEVER_ITEM_MARKUP ?? 5000
+    process.env
+      .DELEVER_ITEM_MARKUP ?? 5000
   );
 
-  if (!Number.isFinite(value) || value < 0) {
+  if (
+    !Number.isFinite(value) ||
+    value < 0
+  ) {
     return 5000;
   }
 
   return Math.round(value);
 };
 
-const setState = async (restaurantId, update) =>
+const setState = async (
+  restaurantId,
+  update
+) =>
   IntegrationState.findOneAndUpdate(
     {
       provider: "delever",
@@ -39,6 +42,7 @@ const setState = async (restaurantId, update) =>
     },
     {
       $set: update,
+
       $setOnInsert: {
         provider: "delever",
         resource: "menu",
@@ -51,7 +55,9 @@ const setState = async (restaurantId, update) =>
     }
   );
 
-const hasValidAvailabilityShape = (payload) => {
+const hasValidAvailabilityShape = (
+  payload
+) => {
   const possibleArrays = [
     payload?.items,
     payload?.products,
@@ -69,230 +75,339 @@ const hasValidAvailabilityShape = (payload) => {
     payload?.result?.availability,
   ];
 
-  return possibleArrays.some(Array.isArray);
+  return possibleArrays.some(
+    Array.isArray
+  );
 };
 
 const syncDeleverMenu = async ({
   restaurantId,
   force = false,
 } = {}) => {
-  const config = getConfig();
-  const id = restaurantId || config.restaurantId;
+  const config =
+    getConfig();
+
+  const id =
+    restaurantId ||
+    config.restaurantId;
 
   if (!config.enabled) {
     return {
       skipped: true,
-      reason: "DELEVER_ENABLED=false",
+      reason:
+        "DELEVER_ENABLED=false",
     };
   }
 
   if (!id) {
-    throw new Error("DELEVER_RESTAURANT_ID kiritilmagan");
+    throw new Error(
+      "DELEVER_RESTAURANT_ID kiritilmagan"
+    );
   }
 
-  const startedAt = new Date();
+  const startedAt =
+    new Date();
 
   await setState(id, {
     status: "running",
-    lastStartedAt: startedAt,
+    lastStartedAt:
+      startedAt,
     lastError: "",
   });
 
   try {
     /*
-     * 1. Delever menyusini olish
+     * Delever menyusini olish
      */
-    const compositionRaw = await getMenuComposition(id);
-    const normalized = normalizeComposition(
-      compositionRaw,
-      id
-    );
+    const compositionRaw =
+      await getMenuComposition(
+        id
+      );
 
-    const previous = await IntegrationState.findOne({
-      provider: "delever",
-      resource: "menu",
-      restaurantId: id,
-    }).lean();
+    const normalized =
+      normalizeComposition(
+        compositionRaw,
+        id
+      );
+
+    const previous =
+      await IntegrationState
+        .findOne({
+          provider:
+            "delever",
+
+          resource:
+            "menu",
+
+          restaurantId:
+            id,
+        })
+        .lean();
 
     /*
-     * lastChange o'zgarmagan bo'lsa ham
-     * stop-list har safar tekshiriladi.
+     * Admin tugmasi force=true yuboradi.
+     * Shunda lastChange o'zgarmagan bo'lsa ham
+     * barcha nom, tarjima, rasm, narx va kategoriyalar
+     * qaytadan yoziladi.
      */
     const compositionChanged =
       force ||
       !normalized.lastChange ||
-      normalized.lastChange !== previous?.lastSourceChange;
+      normalized.lastChange !==
+        previous
+          ?.lastSourceChange;
 
     let upserted = 0;
     let modified = 0;
     let hidden = 0;
 
-    let translationSummary = {
-      uniqueTexts: 0,
-      uzTranslated: 0,
-      enTranslated: 0,
-      skipped: true,
-      reason: "composition_not_changed",
-      error: "",
-    };
+    let productsWithImage = 0;
+    let productsWithoutImage = 0;
 
-    /*
-     * 2. Menyu o'zgargan bo'lsa MongoDB bilan sync
-     */
     if (compositionChanged) {
-      if (!normalized.products.length) {
+      if (
+        !normalized
+          .products.length
+      ) {
         throw new Error(
           "Delever menyu javobidan birorta ham yaroqli taom topilmadi."
         );
       }
 
-      const now = new Date();
-      const itemMarkup = getDeleverItemMarkup();
+      const now =
+        new Date();
 
-      const incomingDeleverIds = normalized.products.map(
-        (product) => product.deleverId
-      );
+      const itemMarkup =
+        getDeleverItemMarkup();
 
-      /*
-       * Oldingi tarjimalar va manual flaglar olinadi.
-       */
-      const existingFoods = await Food.find({
-        source: "delever",
-        deleverRestaurantId: id,
-        deleverId: {
-          $in: incomingDeleverIds,
-        },
-      })
-        .select(
-          [
-            "deleverId",
-            "title",
-            "category",
-            "description",
-            "translationManual",
-          ].join(" ")
-        )
-        .lean();
+      productsWithImage =
+        normalized.products.filter(
+          (product) =>
+            Boolean(
+              String(
+                product.image ||
+                  ""
+              ).trim()
+            )
+        ).length;
 
-      const existingFoodMap = new Map(
-        existingFoods.map((food) => [
-          String(food.deleverId),
-          food,
-        ])
-      );
+      productsWithoutImage =
+        normalized
+          .products.length -
+        productsWithImage;
 
       /*
-       * Delever'dan kelgan foydalanuvchiga ko'rinadigan
-       * barcha matnlar uz/en ga tarjima qilinadi.
-       * Tarjima xato qilsa ruscha fallback bilan sync davom etadi.
+       * Avtomatik tarjima yo'q.
+       * Delever'dan qaysi uz/ru/en qiymatlar kelsa,
+       * MongoDBga aynan o'shalar yoziladi.
        */
-      const translated = await translateDeleverProducts(
-        normalized.products,
-        existingFoodMap
-      );
+      const operations =
+        normalized.products.map(
+          (product) => {
+            const {
+              isAvailable,
 
-      const productsForSync = translated.products;
-      translationSummary = translated.summary;
+              price:
+                incomingBasePrice,
 
-      const operations = productsForSync.map((product) => {
-        const {
-          isAvailable,
-          price: incomingBasePrice,
-          ...productFields
-        } = product;
+              ...productFields
+            } = product;
 
-        /*
-         * Har safar faqat Delever'dan kelgan asl narx asosida
-         * hisoblanadi. Shu sababli 5000 so'm qayta-qayta
-         * qo'shilib ketmaydi.
-         */
-        const deleverBasePrice = Math.max(
-          0,
-          Number(incomingBasePrice) || 0
+            const deleverBasePrice =
+              Math.max(
+                0,
+                Number(
+                  incomingBasePrice
+                ) || 0
+              );
+
+            const setFields = {
+              ...productFields,
+
+              deleverBasePrice,
+
+              packagingFee:
+                itemMarkup,
+
+              price:
+                deleverBasePrice +
+                itemMarkup,
+
+              source:
+                "delever",
+
+              isDeletedInSource:
+                false,
+
+              lastSyncedAt:
+                now,
+
+              translationError:
+                "",
+            };
+
+            if (
+              typeof isAvailable ===
+              "boolean"
+            ) {
+              setFields
+                .isAvailable =
+                isAvailable;
+            }
+
+            return {
+              updateOne: {
+                filter: {
+                  deleverId:
+                    product
+                      .deleverId,
+
+                  deleverRestaurantId:
+                    id,
+                },
+
+                update: {
+                  $set:
+                    setFields,
+
+                  $setOnInsert: {
+                    isAvailable:
+                      typeof isAvailable ===
+                        "boolean"
+                        ? isAvailable
+                        : true,
+                  },
+                },
+
+                upsert: true,
+              },
+            };
+          }
         );
 
-        const setFields = {
-          ...productFields,
-          deleverBasePrice,
-          packagingFee: itemMarkup,
-          price: deleverBasePrice + itemMarkup,
-          source: "delever",
-          isDeletedInSource: false,
-          lastSyncedAt: now,
-          translationError: translationSummary.error || "",
-        };
+      const result =
+        await Food.bulkWrite(
+          operations,
+          {
+            ordered: false,
+          }
+        );
 
-        if (
-          !translationSummary.skipped &&
-          !translationSummary.error
-        ) {
-          setFields.autoTranslatedAt = now;
-        }
+      upserted =
+        result.upsertedCount ||
+        0;
 
-        if (typeof isAvailable === "boolean") {
-          setFields.isAvailable = isAvailable;
-        }
-
-        return {
-          updateOne: {
-            filter: {
-              deleverId: product.deleverId,
-              deleverRestaurantId: id,
-            },
-            update: {
-              $set: setFields,
-              $setOnInsert: {
-                isAvailable:
-                  typeof isAvailable === "boolean"
-                    ? isAvailable
-                    : true,
-              },
-            },
-            upsert: true,
-          },
-        };
-      });
-
-      const result = await Food.bulkWrite(operations, {
-        ordered: false,
-      });
-
-      upserted = result.upsertedCount || 0;
-      modified = result.modifiedCount || 0;
+      modified =
+        result.modifiedCount ||
+        0;
 
       /*
-       * Delever menyusidan yo'qolgan taomlar o'chirilmaydi,
-       * botdan yashiriladi.
+       * Delever menyusidan yo'qolgan itemlar
+       * bazadan o'chirilmaydi, menyudan yashiriladi.
        */
-      const activeIds = productsForSync.map(
-        (product) => product.deleverId
-      );
+      const activeIds =
+        normalized.products.map(
+          (product) =>
+            product.deleverId
+        );
 
-      const hiddenResult = await Food.updateMany(
-        {
-          source: "delever",
-          deleverRestaurantId: id,
-          deleverId: {
-            $nin: activeIds,
-          },
-          isDeletedInSource: {
-            $ne: true,
-          },
-        },
-        {
-          $set: {
-            isDeletedInSource: true,
-            isAvailable: false,
-            lastSyncedAt: now,
-          },
-        }
-      );
+      const hiddenResult =
+        await Food.updateMany(
+          {
+            source:
+              "delever",
 
-      hidden = hiddenResult.modifiedCount || 0;
+            deleverRestaurantId:
+              id,
+
+            deleverId: {
+              $nin:
+                activeIds,
+            },
+
+            isDeletedInSource: {
+              $ne: true,
+            },
+          },
+          {
+            $set: {
+              isDeletedInSource:
+                true,
+
+              isAvailable:
+                false,
+
+              lastSyncedAt:
+                now,
+            },
+          }
+        );
+
+      hidden =
+        hiddenResult
+          .modifiedCount ||
+        0;
+    } else {
+      productsWithImage =
+        await Food.countDocuments(
+          {
+            source:
+              "delever",
+
+            deleverRestaurantId:
+              id,
+
+            isDeletedInSource: {
+              $ne: true,
+            },
+
+            image: {
+              $type:
+                "string",
+
+              $regex:
+                /\S/,
+            },
+          }
+        );
+
+      productsWithoutImage =
+        await Food.countDocuments(
+          {
+            source:
+              "delever",
+
+            deleverRestaurantId:
+              id,
+
+            isDeletedInSource: {
+              $ne: true,
+            },
+
+            $or: [
+              {
+                image: {
+                  $exists:
+                    false,
+                },
+              },
+              {
+                image:
+                  null,
+              },
+              {
+                image: {
+                  $not:
+                    /\S/,
+                },
+              },
+            ],
+          }
+        );
     }
 
     /*
-     * 3. Stop-listni sinxronlash
+     * Stop-listni har safar sync qilamiz.
      */
     let availabilityUpdated = 0;
     let availableProductsUpdated = 0;
@@ -301,172 +416,266 @@ const syncDeleverMenu = async ({
     let modifierCount = 0;
 
     try {
-      const availabilityRaw = await getMenuAvailability(id);
+      const availabilityRaw =
+        await getMenuAvailability(
+          id
+        );
 
-      if (!hasValidAvailabilityShape(availabilityRaw)) {
+      if (
+        !hasValidAvailabilityShape(
+          availabilityRaw
+        )
+      ) {
         throw new Error(
           "Delever availability javobi kutilgan formatda emas."
         );
       }
 
       const availability =
-        availabilityCollections(availabilityRaw);
+        availabilityCollections(
+          availabilityRaw
+        );
 
-      const availabilitySyncedAt = new Date();
+      const availabilitySyncedAt =
+        new Date();
 
-      /*
-       * Availability items ro'yxati stop-list hisoblanadi.
-       */
       const stopItemIds = [
         ...new Set(
           availability.items
             .map((entry) =>
-              availabilityId(entry, "item")
+              availabilityId(
+                entry,
+                "item"
+              )
             )
             .filter(Boolean)
         ),
       ];
 
-      stopListItemsReceived = stopItemIds.length;
+      stopListItemsReceived =
+        stopItemIds.length;
 
-      /*
-       * Stop-listda yo'q faol taomlar qayta mavjud qilinadi.
-       */
       const availableFilter = {
-        source: "delever",
-        deleverRestaurantId: id,
+        source:
+          "delever",
+
+        deleverRestaurantId:
+          id,
+
         isDeletedInSource: {
           $ne: true,
         },
       };
 
-      if (stopItemIds.length) {
-        availableFilter.deleverId = {
-          $nin: stopItemIds,
+      if (
+        stopItemIds.length
+      ) {
+        availableFilter
+          .deleverId = {
+          $nin:
+            stopItemIds,
         };
       }
 
-      const availableResult = await Food.updateMany(
-        availableFilter,
-        {
-          $set: {
-            isAvailable: true,
-            lastSyncedAt: availabilitySyncedAt,
-          },
-        }
-      );
-
-      availableProductsUpdated =
-        availableResult.modifiedCount || 0;
-
-      /*
-       * Stop-listdagi taomlar mavjud emas qilinadi.
-       */
-      if (stopItemIds.length) {
-        const stoppedResult = await Food.updateMany(
-          {
-            source: "delever",
-            deleverRestaurantId: id,
-            deleverId: {
-              $in: stopItemIds,
-            },
-            isDeletedInSource: {
-              $ne: true,
-            },
-          },
+      const availableResult =
+        await Food.updateMany(
+          availableFilter,
           {
             $set: {
-              isAvailable: false,
-              lastSyncedAt: availabilitySyncedAt,
+              isAvailable:
+                true,
+
+              lastSyncedAt:
+                availabilitySyncedAt,
             },
           }
         );
 
+      availableProductsUpdated =
+        availableResult
+          .modifiedCount ||
+        0;
+
+      if (
+        stopItemIds.length
+      ) {
+        const stoppedResult =
+          await Food.updateMany(
+            {
+              source:
+                "delever",
+
+              deleverRestaurantId:
+                id,
+
+              deleverId: {
+                $in:
+                  stopItemIds,
+              },
+
+              isDeletedInSource: {
+                $ne: true,
+              },
+            },
+            {
+              $set: {
+                isAvailable:
+                  false,
+
+                lastSyncedAt:
+                  availabilitySyncedAt,
+              },
+            }
+          );
+
         stoppedProductsUpdated =
-          stoppedResult.modifiedCount || 0;
+          stoppedResult
+            .modifiedCount ||
+          0;
       }
 
       availabilityUpdated =
-        availableProductsUpdated + stoppedProductsUpdated;
+        availableProductsUpdated +
+        stoppedProductsUpdated;
 
-      /*
-       * Modifier stop-list
-       */
       const modifierMap = {};
 
-      for (const modifier of availability.modifiers) {
-        const modifierId = availabilityId(
-          modifier,
-          "modifier"
-        );
+      for (
+        const modifier
+        of availability.modifiers
+      ) {
+        const modifierId =
+          availabilityId(
+            modifier,
+            "modifier"
+          );
 
-        if (!modifierId) continue;
+        if (!modifierId) {
+          continue;
+        }
 
-        modifierMap[modifierId] =
-          availabilityValue(modifier);
+        modifierMap[
+          modifierId
+        ] =
+          availabilityValue(
+            modifier
+          );
       }
 
-      modifierCount = Object.keys(modifierMap).length;
+      modifierCount =
+        Object.keys(
+          modifierMap
+        ).length;
 
       await Food.updateMany(
         {
-          source: "delever",
-          deleverRestaurantId: id,
+          source:
+            "delever",
+
+          deleverRestaurantId:
+            id,
+
           isDeletedInSource: {
             $ne: true,
           },
         },
         {
           $set: {
-            deleverModifierAvailability: modifierMap,
+            deleverModifierAvailability:
+              modifierMap,
           },
         }
       );
-    } catch (availabilityError) {
+    } catch (
+      availabilityError
+    ) {
       console.error(
         "Delever availability sync xato:",
-        availabilityError.message
+        availabilityError
+          .message
       );
     }
 
     const summary = {
-      restaurantId: id,
+      restaurantId:
+        id,
+
+      force:
+        Boolean(force),
+
       compositionChanged,
-      itemMarkup: getDeleverItemMarkup(),
-      translation: {
-        ...translationSummary,
-      },
-      productsReceived: normalized.products.length,
-      categoriesReceived: normalized.categories.length,
-      skippedProducts: normalized.skipped.length,
+
+      sourceTranslations:
+        "delever",
+
+      itemMarkup:
+        getDeleverItemMarkup(),
+
+      productsReceived:
+        normalized
+          .products.length,
+
+      productsWithImage,
+
+      productsWithoutImage,
+
+      categoriesReceived:
+        normalized
+          .categories.length,
+
+      skippedProducts:
+        normalized
+          .skipped.length,
+
       upserted,
       modified,
       hidden,
+
       stopListItemsReceived,
+
       availableProductsUpdated,
+
       stoppedProductsUpdated,
+
       availabilityUpdated,
-      modifierAvailabilityReceived: modifierCount,
+
+      modifierAvailabilityReceived:
+        modifierCount,
     };
 
     await setState(id, {
-      status: "success",
-      lastSourceChange: normalized.lastChange,
-      lastSyncedAt: new Date(),
-      lastError: "",
+      status:
+        "success",
+
+      lastSourceChange:
+        normalized
+          .lastChange,
+
+      lastSyncedAt:
+        new Date(),
+
+      lastError:
+        "",
+
       summary,
     });
 
     return summary;
   } catch (error) {
     await setState(id, {
-      status: "failed",
-      lastError: error.message,
-      summary: error.response
-        ? {
-            response: error.response,
-          }
-        : null,
+      status:
+        "failed",
+
+      lastError:
+        error.message,
+
+      summary:
+        error.response
+          ? {
+              response:
+                error.response,
+            }
+          : null,
     }).catch(() => {});
 
     throw error;

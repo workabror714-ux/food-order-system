@@ -1,5 +1,5 @@
 const {
-  translateToUzAndEn,
+  translateTexts,
 } = require("./translationService");
 
 const USER_TEXT_KEYS = new Set([
@@ -20,14 +20,21 @@ const USER_TEXT_KEYS = new Set([
   "placeholder",
 ]);
 
-const cleanText = (value) => String(value || "").trim();
+const cleanText = (value) =>
+  String(value || "").trim();
 
 const getSourceText = (value) => {
-  if (typeof value === "string" || typeof value === "number") {
+  if (
+    typeof value === "string" ||
+    typeof value === "number"
+  ) {
     return cleanText(value);
   }
 
-  if (!value || typeof value !== "object") {
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
     return "";
   }
 
@@ -46,9 +53,62 @@ const getSourceText = (value) => {
   );
 };
 
-const manualFlagName = (field, language) => {
-  const suffix = language === "uz" ? "Uz" : "En";
+const manualFlagName = (
+  field,
+  language
+) => {
+  const suffix =
+    language === "uz"
+      ? "Uz"
+      : "En";
+
   return `${field}${suffix}`;
+};
+
+const needsMainTranslation = ({
+  field,
+  language,
+  source,
+  existingFood,
+}) => {
+  if (!source) return false;
+
+  const currentField =
+    existingFood?.[field] || {};
+
+  const currentSource =
+    getSourceText(currentField);
+
+  const currentTranslation =
+    cleanText(
+      currentField?.[language]
+    );
+
+  const isManual =
+    existingFood
+      ?.translationManual?.[
+        manualFlagName(
+          field,
+          language
+        )
+      ] === true;
+
+  if (
+    isManual &&
+    currentTranslation
+  ) {
+    return false;
+  }
+
+  if (
+    currentSource === source &&
+    currentTranslation &&
+    currentTranslation !== source
+  ) {
+    return false;
+  }
+
+  return true;
 };
 
 const resolveMainTranslation = ({
@@ -58,16 +118,30 @@ const resolveMainTranslation = ({
   existingFood,
   translationMap,
 }) => {
-  const currentField = existingFood?.[field] || {};
-  const currentSource = getSourceText(currentField);
-  const currentTranslation = cleanText(currentField?.[language]);
+  const currentField =
+    existingFood?.[field] || {};
+
+  const currentSource =
+    getSourceText(currentField);
+
+  const currentTranslation =
+    cleanText(
+      currentField?.[language]
+    );
 
   const isManual =
-    existingFood?.translationManual?.[
-      manualFlagName(field, language)
-    ] === true;
+    existingFood
+      ?.translationManual?.[
+        manualFlagName(
+          field,
+          language
+        )
+      ] === true;
 
-  if (isManual && currentTranslation) {
+  if (
+    isManual &&
+    currentTranslation
+  ) {
     return currentTranslation;
   }
 
@@ -79,11 +153,22 @@ const resolveMainTranslation = ({
     return currentTranslation;
   }
 
-  return (
-    translationMap.get(source) ||
-    currentTranslation ||
-    source
+  const translated = cleanText(
+    translationMap.get(source)
   );
+
+  if (translated) {
+    return translated;
+  }
+
+  if (
+    currentSource === source &&
+    currentTranslation
+  ) {
+    return currentTranslation;
+  }
+
+  return source;
 };
 
 const localizeMainField = ({
@@ -93,7 +178,8 @@ const localizeMainField = ({
   uzTranslations,
   enTranslations,
 }) => {
-  const source = getSourceText(incomingValue);
+  const source =
+    getSourceText(incomingValue);
 
   if (!source) {
     return {
@@ -105,43 +191,72 @@ const localizeMainField = ({
 
   return {
     ru: source,
+
     uz: resolveMainTranslation({
       field,
       language: "uz",
       source,
       existingFood,
-      translationMap: uzTranslations,
+      translationMap:
+        uzTranslations,
     }),
+
     en: resolveMainTranslation({
       field,
       language: "en",
       source,
       existingFood,
-      translationMap: enTranslations,
+      translationMap:
+        enTranslations,
     }),
   };
 };
 
-const collectNestedTexts = (value, collection) => {
+const collectNestedTexts = (
+  value,
+  collection
+) => {
   if (Array.isArray(value)) {
     value.forEach((item) =>
-      collectNestedTexts(item, collection)
+      collectNestedTexts(
+        item,
+        collection
+      )
     );
+
     return;
   }
 
-  if (!value || typeof value !== "object") {
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
     return;
   }
 
-  for (const [key, child] of Object.entries(value)) {
-    if (USER_TEXT_KEYS.has(key)) {
-      const source = getSourceText(child);
-      if (source) collection.add(source);
+  for (
+    const [key, child]
+    of Object.entries(value)
+  ) {
+    if (
+      USER_TEXT_KEYS.has(key)
+    ) {
+      const source =
+        getSourceText(child);
+
+      if (source) {
+        collection.add(source);
+      }
     }
 
-    if (child && typeof child === "object") {
-      collectNestedTexts(child, collection);
+    if (
+      child &&
+      typeof child === "object"
+    ) {
+      collectNestedTexts(
+        child,
+        collection
+      );
     }
   }
 };
@@ -161,31 +276,52 @@ const translateNestedValue = (
     );
   }
 
-  if (!value || typeof value !== "object") {
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
     return value;
   }
 
   const translated = {};
 
-  for (const [key, child] of Object.entries(value)) {
-    if (USER_TEXT_KEYS.has(key)) {
-      const source = getSourceText(child);
+  for (
+    const [key, child]
+    of Object.entries(value)
+  ) {
+    if (
+      USER_TEXT_KEYS.has(key)
+    ) {
+      const source =
+        getSourceText(child);
 
       if (source) {
         translated[key] = {
           ru: source,
-          uz: uzTranslations.get(source) || source,
-          en: enTranslations.get(source) || source,
+          uz:
+            cleanText(
+              uzTranslations.get(
+                source
+              )
+            ) || source,
+          en:
+            cleanText(
+              enTranslations.get(
+                source
+              )
+            ) || source,
         };
+
         continue;
       }
     }
 
-    translated[key] = translateNestedValue(
-      child,
-      uzTranslations,
-      enTranslations
-    );
+    translated[key] =
+      translateNestedValue(
+        child,
+        uzTranslations,
+        enTranslations
+      );
   }
 
   return translated;
@@ -195,101 +331,204 @@ const translateDeleverProducts = async (
   products,
   existingFoodMap = new Map()
 ) => {
-  const textCollection = new Set();
+  const uzTextCollection =
+    new Set();
+
+  const enTextCollection =
+    new Set();
+
+  const nestedTextCollection =
+    new Set();
 
   for (const product of products) {
-    const title = getSourceText(product.title);
-    const category = getSourceText(product.category);
-    const description = getSourceText(product.description);
+    const existingFood =
+      existingFoodMap.get(
+        String(product.deleverId)
+      );
 
-    if (title) textCollection.add(title);
-    if (category) textCollection.add(category);
-    if (description) textCollection.add(description);
+    const fields = [
+      ["title", product.title],
+      ["category", product.category],
+      [
+        "description",
+        product.description,
+      ],
+    ];
+
+    for (
+      const [field, value]
+      of fields
+    ) {
+      const source =
+        getSourceText(value);
+
+      if (
+        needsMainTranslation({
+          field,
+          language: "uz",
+          source,
+          existingFood,
+        })
+      ) {
+        uzTextCollection.add(
+          source
+        );
+      }
+
+      if (
+        needsMainTranslation({
+          field,
+          language: "en",
+          source,
+          existingFood,
+        })
+      ) {
+        enTextCollection.add(
+          source
+        );
+      }
+    }
 
     collectNestedTexts(
       product.modifierGroups,
-      textCollection
+      nestedTextCollection
     );
   }
 
-  let uzTranslations = new Map();
-  let enTranslations = new Map();
-
-  let summary = {
-    uniqueTexts: textCollection.size,
-    uzTranslated: 0,
-    enTranslated: 0,
-    skipped: true,
-    reason: "translation_not_started",
-    error: "",
-  };
-
-  try {
-    const translation = await translateToUzAndEn(
-      [...textCollection],
-      {
-        sourceLanguage:
-          process.env.TRANSLATE_SOURCE_LANGUAGE || "ru",
-      }
-    );
-
-    uzTranslations = translation.uz;
-    enTranslations = translation.en;
-
-    summary = {
-      ...translation.summary,
-      error: "",
-    };
-  } catch (error) {
-    summary = {
-      ...summary,
-      skipped: true,
-      reason: "translation_error",
-      error: String(
-        error.message || "Tarjima xatosi"
-      ).slice(0, 1000),
-    };
+  for (
+    const text of nestedTextCollection
+  ) {
+    uzTextCollection.add(text);
+    enTextCollection.add(text);
   }
 
-  const translatedProducts = products.map((product) => {
-    const existingFood = existingFoodMap.get(
-      String(product.deleverId)
-    );
+  const sourceLanguage =
+    process.env
+      .TRANSLATE_SOURCE_LANGUAGE ||
+    "ru";
 
-    return {
-      ...product,
-      title: localizeMainField({
-        field: "title",
-        incomingValue: product.title,
-        existingFood,
-        uzTranslations,
-        enTranslations,
-      }),
-      category: localizeMainField({
-        field: "category",
-        incomingValue: product.category,
-        existingFood,
-        uzTranslations,
-        enTranslations,
-      }),
-      description: localizeMainField({
-        field: "description",
-        incomingValue: product.description,
-        existingFood,
-        uzTranslations,
-        enTranslations,
-      }),
-      translatedModifierGroups: translateNestedValue(
-        product.modifierGroups,
-        uzTranslations,
-        enTranslations
+  const [uzResult, enResult] =
+    await Promise.all([
+      translateTexts(
+        [...uzTextCollection],
+        "uz",
+        { sourceLanguage }
       ),
-    };
-  });
+      translateTexts(
+        [...enTextCollection],
+        "en",
+        { sourceLanguage }
+      ),
+    ]);
+
+  const summaryErrors = [
+    ...uzResult.errors.map(
+      (item) => ({
+        language: "uz",
+        ...item,
+      })
+    ),
+    ...enResult.errors.map(
+      (item) => ({
+        language: "en",
+        ...item,
+      })
+    ),
+  ].slice(0, 10);
+
+  const translatedProducts =
+    products.map((product) => {
+      const existingFood =
+        existingFoodMap.get(
+          String(
+            product.deleverId
+          )
+        );
+
+      return {
+        ...product,
+
+        title: localizeMainField({
+          field: "title",
+          incomingValue:
+            product.title,
+          existingFood,
+          uzTranslations:
+            uzResult.translations,
+          enTranslations:
+            enResult.translations,
+        }),
+
+        category:
+          localizeMainField({
+            field: "category",
+            incomingValue:
+              product.category,
+            existingFood,
+            uzTranslations:
+              uzResult.translations,
+            enTranslations:
+              enResult.translations,
+          }),
+
+        description:
+          localizeMainField({
+            field: "description",
+            incomingValue:
+              product.description,
+            existingFood,
+            uzTranslations:
+              uzResult.translations,
+            enTranslations:
+              enResult.translations,
+          }),
+
+        translatedModifierGroups:
+          translateNestedValue(
+            product.modifierGroups,
+            uzResult.translations,
+            enResult.translations
+          ),
+      };
+    });
 
   return {
-    products: translatedProducts,
-    summary,
+    products:
+      translatedProducts,
+
+    summary: {
+      provider: "mymemory",
+      uniqueUzTexts:
+        uzTextCollection.size,
+      uniqueEnTexts:
+        enTextCollection.size,
+      uzTranslated:
+        uzResult.translatedCount,
+      enTranslated:
+        enResult.translatedCount,
+      uzFailed:
+        uzResult.failedCount,
+      enFailed:
+        enResult.failedCount,
+      skipped:
+        uzResult.skipped &&
+        enResult.skipped,
+      reason:
+        uzResult.reason ||
+        enResult.reason ||
+        "",
+      error:
+        summaryErrors.length
+          ? summaryErrors
+              .map(
+                (item) =>
+                  `${item.language}: ${item.message}`
+              )
+              .join(" | ")
+              .slice(0, 1000)
+          : "",
+      errors: summaryErrors,
+    },
   };
 };
 

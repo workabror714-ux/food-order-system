@@ -128,9 +128,10 @@ const getRestaurantIdForOrder = (
   order
 ) =>
   cleanText(
-    order.deleverRestaurantId ||
-      process.env
-        .DELEVER_RESTAURANT_ID
+    process.env.DELEVER_ORDER_RESTAURANT_ID ||
+      order.deleverOrderRestaurantId ||
+      order.deleverRestaurantId ||
+      process.env.DELEVER_RESTAURANT_ID
   );
 
 const getItemBasePrice = (item) => {

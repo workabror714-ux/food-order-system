@@ -127,7 +127,7 @@ const getConfig = () => {
         process.env
           .DELEVER_TOKEN_PATH,
 
-        "/v1/security/oauth/token"
+        "/v1/custom-integration/security/oauth/token"
       ),
 
     restaurantsPath:
@@ -135,7 +135,7 @@ const getConfig = () => {
         process.env
           .DELEVER_RESTAURANTS_PATH,
 
-        "/v1/restaurants"
+        "/v1/custom-integration/restaurants"
       ),
 
     menuCompositionPath:
@@ -143,7 +143,7 @@ const getConfig = () => {
         process.env
           .DELEVER_MENU_COMPOSITION_PATH,
 
-        "/v1/menu/{restaurantId}/composition"
+        "/v1/custom-integration/menu/{restaurantId}/composition"
       ),
 
     menuAvailabilityPath:
@@ -151,19 +151,18 @@ const getConfig = () => {
         process.env
           .DELEVER_MENU_AVAILABILITY_PATH,
 
-        "/v1/menu/{restaurantId}/availability"
+        "/v1/custom-integration/menu/{restaurantId}/availability"
       ),
 
     /*
-     * Rasmiy order endpoint:
-     * POST /v1/order
+     * Delever Custom Integration V2 endpointlari.
      */
     orderPath:
       normalizePath(
         process.env
           .DELEVER_ORDER_PATH,
 
-        "/v1/order"
+        "/v1/custom-integration/order"
       ),
 
     orderStatusPath:
@@ -171,7 +170,7 @@ const getConfig = () => {
         process.env
           .DELEVER_ORDER_STATUS_PATH,
 
-        "/v1/order/{orderId}/status"
+        "/v1/custom-integration/order/{orderId}/status"
       ),
 
     orderCancelPath:
@@ -179,7 +178,15 @@ const getConfig = () => {
         process.env
           .DELEVER_ORDER_CANCEL_PATH,
 
-        "/v1/order/{orderId}"
+        "/v1/custom-integration/order/{orderId}"
+      ),
+
+    orderDetailsPath:
+      normalizePath(
+        process.env
+          .DELEVER_ORDER_DETAILS_PATH,
+
+        "/v1/custom-integration/order/{orderId}"
       ),
 
     grantType:
@@ -877,7 +884,14 @@ const getMenuComposition = (
           id,
       }
     ),
-    options
+    {
+      ...options,
+      headers: {
+        Accept:
+          MENU_COMPOSITION_V2,
+        ...(options?.headers || {}),
+      },
+    }
   );
 };
 
@@ -904,9 +918,25 @@ const getMenuAvailability = (
           id,
       }
     ),
-    options
+    {
+      ...options,
+      headers: {
+        Accept:
+          MENU_AVAILABILITY_V2,
+        ...(options?.headers || {}),
+      },
+    }
   );
 };
+
+const ORDER_V2_CONTENT_TYPE =
+  "application/vnd.eats.order.v2+json";
+
+const MENU_COMPOSITION_V2 =
+  "application/vnd.eats.menu.composition.v2+json";
+
+const MENU_AVAILABILITY_V2 =
+  "application/vnd.eats.menu.availability.v2+json";
 
 const createOrder = (
   payload,
@@ -926,8 +956,103 @@ const createOrder = (
       method:
         "POST",
 
+      headers: {
+        "Content-Type":
+          ORDER_V2_CONTENT_TYPE,
+        Accept:
+          "application/json",
+        ...(options.headers || {}),
+      },
+
       body:
         payload,
+    }
+  );
+};
+
+const getOrder = (
+  orderId,
+  options
+) => {
+  const config =
+    assertConfigured();
+
+  return deleverRequest(
+    replacePathParams(
+      config
+        .orderDetailsPath,
+      {
+        orderId,
+      }
+    ),
+    options
+  );
+};
+
+const updateOrder = (
+  orderId,
+  payload,
+  options = {}
+) => {
+  const config =
+    assertConfigured();
+
+  return deleverRequest(
+    replacePathParams(
+      config
+        .orderDetailsPath,
+      {
+        orderId,
+      }
+    ),
+    {
+      ...options,
+      method: "PUT",
+      headers: {
+        "Content-Type":
+          ORDER_V2_CONTENT_TYPE,
+        Accept:
+          "application/json",
+        ...(options.headers || {}),
+      },
+      body: payload,
+    }
+  );
+};
+
+const updateOrderStatus = (
+  orderId,
+  status,
+  comment = "",
+  options = {}
+) => {
+  const config =
+    assertConfigured();
+
+  const body = {
+    status:
+      String(status || "")
+        .trim()
+        .toUpperCase(),
+  };
+
+  if (String(comment || "").trim()) {
+    body.comment =
+      String(comment).trim();
+  }
+
+  return deleverRequest(
+    replacePathParams(
+      config
+        .orderStatusPath,
+      {
+        orderId,
+      }
+    ),
+    {
+      ...options,
+      method: "PUT",
+      body,
     }
   );
 };
@@ -990,7 +1115,13 @@ module.exports = {
   getRestaurants,
   getMenuComposition,
   getMenuAvailability,
+  ORDER_V2_CONTENT_TYPE,
+  MENU_COMPOSITION_V2,
+  MENU_AVAILABILITY_V2,
   createOrder,
+  getOrder,
+  updateOrder,
   getOrderStatus,
+  updateOrderStatus,
   cancelOrder,
 };

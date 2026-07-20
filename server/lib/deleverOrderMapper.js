@@ -24,17 +24,43 @@ const boolEnv = (
 };
 
 const cleanText = (value) =>
-  String(value || "").trim();
+  String(value ?? "").trim();
 
-const positiveNumber = (
+const finiteNumber = (
   value,
   fallback = 0
 ) => {
   const number = Number(value);
 
+  return Number.isFinite(number)
+    ? number
+    : fallback;
+};
+
+const positiveNumber = (
+  value,
+  fallback = 0
+) => {
+  const number =
+    finiteNumber(
+      value,
+      fallback
+    );
+
+  return number >= 0
+    ? number
+    : fallback;
+};
+
+const positiveQuantity = (
+  value,
+  fallback = 1
+) => {
+  const number = Number(value);
+
   if (
     !Number.isFinite(number) ||
-    number < 0
+    number <= 0
   ) {
     return fallback;
   }
@@ -43,9 +69,7 @@ const positiveNumber = (
 };
 
 const normalizePhone = (value) => {
-  const raw =
-    cleanText(value);
-
+  const raw = cleanText(value);
   const digits =
     raw.replace(/[^0-9]/g, "");
 
@@ -56,27 +80,67 @@ const normalizePhone = (value) => {
   return `+${digits}`;
 };
 
+/*
+ * Custom Integration V2 faqat CASH yoki CARD qabul qiladi.
+ * Click/Payme orqali to'langan order CARD hisoblanadi.
+ */
 const paymentTypeForDelever = (
   order
 ) => {
-  const key = String(
+  const key = cleanText(
     order.paymentType ||
       order.paymentProvider ||
       "cash"
-  )
-    .trim()
-    .toUpperCase();
+  ).toUpperCase();
 
-  return cleanText(
+  const override = cleanText(
     process.env[
       `DELEVER_PAYMENT_TYPE_${key}`
-    ] ||
-      (
-        key === "CASH"
-          ? "cash"
-          : "card"
-      )
-  );
+    ]
+  ).toUpperCase();
+
+  if (
+    ["CASH", "CARD"].includes(
+      override
+    )
+  ) {
+    return override;
+  }
+
+  return key === "CASH"
+    ? "CASH"
+    : "CARD";
+};
+
+/*
+ * pickup   -> takeaway
+ * delivery -> delivery (restoran yetkazib beradi)
+ * aggregator env orqali tanlanadi, masalan tashqi kuryer tizimi uchun.
+ */
+const discriminatorForDelever = (
+  order
+) => {
+  const explicit = cleanText(
+    order.deleverDiscriminator ||
+      process.env
+        .DELEVER_ORDER_DISCRIMINATOR
+  ).toLowerCase();
+
+  if (
+    [
+      "aggregator",
+      "delivery",
+      "takeaway",
+    ].includes(explicit)
+  ) {
+    return explicit;
+  }
+
+  return cleanText(
+    order.orderType
+  ).toLowerCase() === "pickup"
+    ? "takeaway"
+    : "delivery";
 };
 
 const modifierId = (modifier) =>
@@ -102,13 +166,6 @@ const mapModifiers = (
             "Modifier"
         ),
 
-      price:
-        positiveNumber(
-          modifier.deleverBasePrice ??
-            modifier.price,
-          0
-        ),
-
       quantity:
         Math.max(
           1,
@@ -118,21 +175,31 @@ const mapModifiers = (
             ) || 1
           )
         ),
+
+      price:
+        positiveNumber(
+          modifier.deleverBasePrice ??
+            modifier.price,
+          0
+        ),
     }))
     .filter(
       (modifier) =>
         modifier.id
     );
 
-const getRestaurantIdForOrder = (
-  order
-) =>
-  cleanText(
-    process.env.DELEVER_ORDER_RESTAURANT_ID ||
-      order.deleverOrderRestaurantId ||
-      order.deleverRestaurantId ||
-      process.env.DELEVER_RESTAURANT_ID
+/*
+ * Custom Integration order uchun aynan
+ * GET /v1/custom-integration/restaurants javobidagi Delever place ID ishlatiladi.
+ * Neon Alisa ichidagi branch ID payloadga yuborilmaydi.
+ */
+const getRestaurantIdForOrder = () => {
+  const config = getConfig();
+
+  return cleanText(
+    config.restaurantId
   );
+};
 
 const getItemBasePrice = (item) => {
   const explicit =
@@ -157,24 +224,17 @@ const getItemBasePrice = (item) => {
       0
     );
 
-  /*
-   * Eski orderlarda deleverBasePrice bo'lmasa,
-   * public price'dan packagingFee ayriladi.
-   */
   return Math.max(
     0,
-    publicPrice -
-      packagingFee
+    publicPrice - packagingFee
   );
 };
 
 const itemCost = (item) => {
   const quantity =
-    Math.max(
-      1,
-      Math.floor(
-        Number(item.quantity) || 1
-      )
+    positiveQuantity(
+      item.quantity,
+      1
     );
 
   const base =
@@ -192,13 +252,9 @@ const itemCost = (item) => {
             modifier.price,
             0
           ) *
-            Math.max(
-              1,
-              Math.floor(
-                Number(
-                  modifier.quantity
-                ) || 1
-              )
+            positiveQuantity(
+              modifier.quantity,
+              1
             ),
         0
       );
@@ -241,12 +297,7 @@ const buildPackagingItems = (
         "Idish puli"
     );
 
-  /*
-   * Turli packagingFee bo'lsa, har bir narx
-   * bo'yicha alohida item hosil qilinadi.
-   */
-  const grouped =
-    new Map();
+  const grouped = new Map();
 
   for (
     const item
@@ -266,69 +317,121 @@ const buildPackagingItems = (
       Math.max(
         1,
         Math.floor(
-          Number(
-            item.quantity
-          ) || 1
+          Number(item.quantity) || 1
         )
       );
 
     grouped.set(
       fee,
-      (
-        grouped.get(fee) ||
-        0
-      ) + quantity
+      (grouped.get(fee) || 0) +
+        quantity
     );
   }
 
   return [
     ...grouped.entries(),
   ].map(
-    ([
-      price,
-      quantity,
-    ]) => ({
+    ([price, quantity]) => ({
       id: productId,
       name: productName,
       price,
       quantity,
       modifications: [],
+      promos: [],
     })
   );
 };
 
-/*
- * Delever rasmiy hujjatidagi minimal order modeli:
- *
- * comment
- * deliveryInfo.clientName
- * deliveryInfo.courierArrivementDate (optional)
- * deliveryInfo.phoneNumber
- * items[].id/name/price/quantity/modifications
- * paymentInfo.itemsCost/paymentType
- * persons
- * restaurantId
- *
- * Bu payloadga externalOrderId, platform, orderType,
- * address, coordinates, deliveryCost, isPaid, crmId
- * yoki crmField qo'shilmaydi.
- */
+const firstFinite = (...values) => {
+  for (const value of values) {
+    const number = Number(value);
+
+    if (Number.isFinite(number)) {
+      return number;
+    }
+  }
+
+  return null;
+};
+
+const buildDeliveryAddress = (
+  order
+) => {
+  const isPickup =
+    cleanText(order.orderType)
+      .toLowerCase() ===
+    "pickup";
+
+  const full = cleanText(
+    order.address ||
+      (
+        isPickup
+          ? `${order.filialName || "Yalpiz"} — olib ketish`
+          : "Manzil ko'rsatilmagan"
+      )
+  );
+
+  const latitude = firstFinite(
+    order.location?.lat,
+    order.location?.latitude,
+    order.latitude
+  );
+
+  const longitude = firstFinite(
+    order.location?.lng,
+    order.location?.long,
+    order.location?.longitude,
+    order.longitude
+  );
+
+  const deliveryAddress = {
+    full,
+  };
+
+  if (latitude !== null) {
+    deliveryAddress.latitude =
+      String(latitude);
+  }
+
+  if (longitude !== null) {
+    deliveryAddress.longitude =
+      String(longitude);
+  }
+
+  return deliveryAddress;
+};
+
+const buildItemPromos = (item) =>
+  Array.isArray(item.promos)
+    ? item.promos
+    : [];
+
+const buildOrderPromos = (order) =>
+  Array.isArray(order.promos)
+    ? order.promos
+    : [];
+
 const buildDeleverOrderPayload = (
   order,
   options = {}
 ) => {
-  const config =
-    getConfig();
-
   const restaurantId =
-    getRestaurantIdForOrder(
-      order
-    ) ||
-    config.restaurantId;
+    getRestaurantIdForOrder();
 
   if (!restaurantId) {
     throw new Error(
-      "Delever Restaurant ID topilmadi"
+      "DELEVER_RESTAURANT_ID topilmadi"
+    );
+  }
+
+  const externalId = cleanText(
+    order.deleverExternalId ||
+      order._id
+  );
+
+  if (!externalId) {
+    throw new Error(
+      "Delever eatsId uchun lokal order ID topilmadi"
     );
   }
 
@@ -368,16 +471,13 @@ const buildDeleverOrderPayload = (
   const menuItems =
     (order.items || [])
       .map((item) => {
-        const id =
-          cleanText(
-            item.deleverProductId ||
-              item.foodId
-          );
+        const id = cleanText(
+          item.deleverProductId ||
+            item.foodId
+        );
 
         const price =
-          getItemBasePrice(
-            item
-          );
+          getItemBasePrice(item);
 
         if (!id) {
           return null;
@@ -389,7 +489,7 @@ const buildDeleverOrderPayload = (
           );
         }
 
-        return {
+        const mapped = {
           id,
 
           name:
@@ -399,24 +499,42 @@ const buildDeleverOrderPayload = (
                 "Taom"
             ),
 
-          price,
-
           quantity:
-            Math.max(
-              1,
-              Math.floor(
-                Number(
-                  item.quantity
-                ) || 1
-              )
+            positiveQuantity(
+              item.quantity,
+              1
             ),
+
+          price,
 
           modifications:
             mapModifiers(
               item.modifiers ||
+                item.modifications ||
                 []
             ),
+
+          promos:
+            buildItemPromos(item),
         };
+
+        if (
+          item.comboInfo &&
+          typeof item.comboInfo ===
+            "object"
+        ) {
+          mapped.comboInfo = {
+            id: cleanText(
+              item.comboInfo.id
+            ),
+            componentId: cleanText(
+              item.comboInfo
+                .componentId
+            ),
+          };
+        }
+
+        return mapped;
       })
       .filter(Boolean);
 
@@ -427,8 +545,7 @@ const buildDeleverOrderPayload = (
   }
 
   const includePackaging =
-    options
-      .includePackagingItem ===
+    options.includePackagingItem ===
     undefined
       ? true
       : Boolean(
@@ -436,34 +553,32 @@ const buildDeleverOrderPayload = (
             .includePackagingItem
         );
 
-  const packagingItems =
-    includePackaging
-      ? buildPackagingItems(
-          order
-        )
-      : [];
-
   const items = [
     ...menuItems,
-    ...packagingItems,
+    ...(
+      includePackaging
+        ? buildPackagingItems(order)
+        : []
+    ),
   ];
 
   const itemsCost =
     items.reduce(
-      (
-        sum,
-        item
-      ) =>
-        sum +
-        itemCost(item),
+      (sum, item) =>
+        sum + itemCost(item),
       0
     );
 
-  const externalId =
-    cleanText(
-      order._id ||
-        order.deleverExternalId
+  const phoneNumber =
+    normalizePhone(
+      order.customerPhone
     );
+
+  if (!phoneNumber) {
+    throw new Error(
+      "Delever order uchun telefon raqami topilmadi"
+    );
+  }
 
   const deliveryInfo = {
     clientName:
@@ -471,10 +586,14 @@ const buildDeleverOrderPayload = (
         order.customerName
       ),
 
-    phoneNumber:
-      normalizePhone(
-        order.customerPhone
-      ),
+    phoneNumber,
+
+    /*
+     * V2 schema bo'yicha deliveryAddress majburiy.
+     * Takeaway orderda ham obyekt yuboriladi.
+     */
+    deliveryAddress:
+      buildDeliveryAddress(order),
   };
 
   const arrivalMinutes =
@@ -503,9 +622,7 @@ const buildDeleverOrderPayload = (
     );
 
   const defaultComment =
-    externalId
-      ? `Telegram Web App buyurtmasi #${externalId}`
-      : "Telegram Web App buyurtmasi";
+    `Telegram Web App buyurtmasi #${externalId}`;
 
   const comment = [
     commentPrefix,
@@ -514,34 +631,86 @@ const buildDeleverOrderPayload = (
     .filter(Boolean)
     .join(" — ");
 
-  return {
-    comment,
+  const paymentInfo = {
+    itemsCost,
+    paymentType:
+      paymentTypeForDelever(
+        order
+      ),
+  };
+
+  const sendDeliveryCost =
+    boolEnv(
+      "DELEVER_SEND_DELIVERY_COST",
+      false
+    );
+
+  if (sendDeliveryCost) {
+    paymentInfo.deliveryFee =
+      positiveNumber(
+        order.deliveryPrice,
+        0
+      );
+  }
+
+  const payload = {
+    platform:
+      cleanText(
+        process.env
+          .DELEVER_PLATFORM ||
+          "BOT"
+      ),
+
+    discriminator:
+      discriminatorForDelever(
+        order
+      ),
+
+    eatsId:
+      externalId,
+
+    restaurantId,
 
     deliveryInfo,
 
+    paymentInfo,
+
     items,
-
-    paymentInfo: {
-      itemsCost,
-
-      paymentType:
-        paymentTypeForDelever(
-          order
-        ),
-    },
 
     persons:
       Math.max(
         1,
         Math.floor(
-          Number(
-            order.persons
-          ) || 1
+          Number(order.persons) ||
+            1
         )
       ),
 
-    restaurantId,
+    comment,
+
+    promos:
+      buildOrderPromos(order),
   };
+
+  if (
+    cleanText(order.preOrderTime)
+  ) {
+    payload.preOrderTime =
+      cleanText(
+        order.preOrderTime
+      );
+  }
+
+  if (
+    cleanText(order.kitchenSentTime)
+  ) {
+    payload.kitchenSentTime =
+      cleanText(
+        order.kitchenSentTime
+      );
+  }
+
+  return payload;
 };
 
 const extractDeleverOrderId = (
@@ -577,10 +746,9 @@ const extractDeleverOrderId = (
 const mapDeleverStatus = (
   rawStatus
 ) => {
-  const value =
-    cleanText(
-      rawStatus
-    ).toLowerCase();
+  const value = cleanText(
+    rawStatus
+  ).toUpperCase();
 
   if (!value) {
     return null;
@@ -588,11 +756,9 @@ const mapDeleverStatus = (
 
   if (
     [
-      "cancelled",
-      "canceled",
-      "rejected",
-      "отменен",
-      "отменён",
+      "CANCELLED",
+      "CANCELED",
+      "REJECTED",
     ].some(
       (item) =>
         value.includes(item)
@@ -603,13 +769,10 @@ const mapDeleverStatus = (
 
   if (
     [
-      "delivered",
-      "completed",
-      "complete",
-      "done",
-      "доставлен",
-      "завершен",
-      "завершён",
+      "DELIVERED",
+      "COMPLETED",
+      "COMPLETE",
+      "DONE",
     ].some(
       (item) =>
         value.includes(item)
@@ -620,12 +783,10 @@ const mapDeleverStatus = (
 
   if (
     [
-      "on_way",
-      "onway",
-      "courier",
-      "delivery",
-      "в пути",
-      "курьер",
+      "TAKEN_BY_COURIER",
+      "ON_WAY",
+      "ONWAY",
+      "COURIER",
     ].some(
       (item) =>
         value.includes(item)
@@ -636,11 +797,10 @@ const mapDeleverStatus = (
 
   if (
     [
-      "preparing",
-      "cooking",
-      "accepted",
-      "готов",
-      "принят",
+      "PREPARING",
+      "COOKING",
+      "ACCEPTED",
+      "READY",
     ].some(
       (item) =>
         value.includes(item)
@@ -651,9 +811,8 @@ const mapDeleverStatus = (
 
   if (
     [
-      "new",
-      "created",
-      "новый",
+      "NEW",
+      "CREATED",
     ].some(
       (item) =>
         value.includes(item)

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { LOGO_WHITE } from "./i18n";
 import { AppIcon } from "./icons";
 import { api } from "./api";
-import { getField, sortCategories } from "./adminUtils";
+import { sortCategories } from "./adminUtils";
 import FoodsTab from "./admin/FoodsTab";
 import OrdersTab from "./admin/OrdersTab";
 import BannerTab from "./admin/BannerTab";
@@ -10,6 +10,13 @@ import FilialsTab from "./admin/FilialsTab";
 import AdminsTab from "./admin/AdminsTab";
 import CustomersTab from "./admin/CustomersTab";
 import BroadcastTab from "./admin/BroadcastTab";
+
+
+const getExactLocalizedField = (value, lang) => {
+  if (!value) return "";
+  if (typeof value === "string") return lang === "ru" ? value : "";
+  return String(value?.[lang] || "").trim();
+};
 
 // Admin panel — ingichka shell: topbar + tablar + faol tab komponenti.
 // Har bir tab mustaqil; foods/categories Foods va Banner tablar bo'lishadi.
@@ -51,9 +58,9 @@ export default function Admin() {
         const category =
           food.category && typeof food.category === "object"
             ? {
-                uz: getField(food.category, "uz"),
-                ru: getField(food.category, "ru"),
-                en: getField(food.category, "en"),
+                uz: getExactLocalizedField(food.category, "uz"),
+                ru: getExactLocalizedField(food.category, "ru"),
+                en: getExactLocalizedField(food.category, "en"),
               }
             : {
                 uz: String(food.category || ""),

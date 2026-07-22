@@ -13,6 +13,34 @@ import { thumb } from "../img";
 
 const emptyLang = () => ({ uz: "", ru: "", en: "" });
 
+// Admin tahrirlash oynasida fallback ishlatmaymiz.
+// Masalan UZ bo'sh bo'lsa RU matnini UZ sifatida ko'rsatish noto'g'ri.
+const getExactField = (value, lang) => {
+  if (!value) return "";
+  if (typeof value === "string") return lang === "ru" ? value : "";
+  return String(value?.[lang] || "").trim();
+};
+
+const getTranslationIssues = (food) => {
+  const issues = [];
+  const ruTitle = getExactField(food?.title, "ru");
+  const ruDescription = getExactField(food?.description, "ru");
+
+  if (!getExactField(food?.title, "uz")) issues.push("titleUz");
+  if (!getExactField(food?.title, "en")) issues.push("titleEn");
+  if (ruDescription && !getExactField(food?.description, "uz")) {
+    issues.push("descriptionUz");
+  }
+  if (ruDescription && !getExactField(food?.description, "en")) {
+    issues.push("descriptionEn");
+  }
+
+  // Eski yoki noto'g'ri import qilingan yozuvlarda RU title bo'lmasa ham
+  // admin buni ko'ra olishi uchun alohida belgi.
+  if (!ruTitle) issues.push("titleRu");
+  return issues;
+};
+
 const asCategory = (value, extras = {}) => {
   const localized =
     value && typeof value === "object"
@@ -71,26 +99,40 @@ export default function FoodsTab({
   const [categorySaving, setCategorySaving] = useState(false);
 
   const [search, setSearch] = useState("");
+  const [translationFilter, setTranslationFilter] = useState("all");
 
   const isDeleverEdit = editingFood?.source === "delever";
 
   const visibleFoods = useMemo(() => {
-    const deleverFoods = foods.filter(
-      (food) =>
-        food?.source === "delever" &&
-        food?.deleverId
+    let result = foods.filter(
+      (food) => food?.source === "delever" && food?.deleverId
     );
 
-    const query = search.trim().toLowerCase();
-    if (!query) return deleverFoods;
+    if (translationFilter !== "all") {
+      result = result.filter((food) => {
+        const issues = getTranslationIssues(food);
+        if (translationFilter === "missing") return issues.length > 0;
+        if (translationFilter === "missingUz") {
+          return issues.some((issue) => issue.endsWith("Uz"));
+        }
+        if (translationFilter === "missingEn") {
+          return issues.some((issue) => issue.endsWith("En"));
+        }
+        return true;
+      });
+    }
 
-    return deleverFoods.filter((food) => {
+    const query = search.trim().toLowerCase();
+    if (!query) return result;
+
+    return result.filter((food) => {
       const haystack = [
-        getField(food.title, "uz"),
-        getField(food.title, "ru"),
-        getField(food.title, "en"),
-        getField(food.category, "uz"),
-        getField(food.category, "ru"),
+        getExactField(food.title, "uz"),
+        getExactField(food.title, "ru"),
+        getExactField(food.title, "en"),
+        getExactField(food.category, "uz"),
+        getExactField(food.category, "ru"),
+        getExactField(food.category, "en"),
         food.deleverId,
       ]
         .filter(Boolean)
@@ -99,7 +141,7 @@ export default function FoodsTab({
 
       return haystack.includes(query);
     });
-  }, [foods, search]);
+  }, [foods, search, translationFilter]);
 
   const resetForm = () => {
     setTitles(emptyLang());
@@ -314,15 +356,15 @@ export default function FoodsTab({
 
   const handleEdit = (food) => {
     setTitles({
-      uz: getField(food.title, "uz"),
-      ru: getField(food.title, "ru"),
-      en: getField(food.title, "en"),
+      uz: getExactField(food.title, "uz"),
+      ru: getExactField(food.title, "ru"),
+      en: getExactField(food.title, "en"),
     });
 
     setDescs({
-      uz: getField(food.description, "uz"),
-      ru: getField(food.description, "ru"),
-      en: getField(food.description, "en"),
+      uz: getExactField(food.description, "uz"),
+      ru: getExactField(food.description, "ru"),
+      en: getExactField(food.description, "en"),
     });
 
     setSelectedCat(
@@ -416,9 +458,9 @@ export default function FoodsTab({
   const startCategoryEdit = (category) => {
     setEditingCategory(category);
     setCategoryDraft({
-      uz: getField(category, "uz"),
-      ru: getField(category, "ru"),
-      en: getField(category, "en"),
+      uz: getExactField(category, "uz"),
+      ru: getExactField(category, "ru"),
+      en: getExactField(category, "en"),
     });
   };
 
@@ -535,15 +577,15 @@ export default function FoodsTab({
                     >
                       <div>
                         <span className="category-language-label">RU</span>
-                        <strong>{getField(category, "ru") || "—"}</strong>
+                        <strong>{getExactField(category, "ru") || "—"}</strong>
                       </div>
                       <div>
                         <span className="category-language-label">UZ</span>
-                        <strong>{getField(category, "uz") || "—"}</strong>
+                        <strong>{getExactField(category, "uz") || "Tarjima kiritilmagan"}</strong>
                       </div>
                       <div>
                         <span className="category-language-label">EN</span>
-                        <strong>{getField(category, "en") || "—"}</strong>
+                        <strong>{getExactField(category, "en") || "Tarjima kiritilmagan"}</strong>
                       </div>
                       <button
                         type="button"
@@ -980,12 +1022,25 @@ export default function FoodsTab({
           <h2 className="section-title">
             <AppIcon name="list" size={18} /> Delever taomlari ({visibleFoods.length})
           </h2>
-          <input
-            className="admin-search-input"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Taom yoki kategoriya qidirish..."
-          />
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <select
+              className="admin-search-input"
+              value={translationFilter}
+              onChange={(event) => setTranslationFilter(event.target.value)}
+              style={{ minWidth: 190 }}
+            >
+              <option value="all">Barcha tarjimalar</option>
+              <option value="missing">Tarjimasi to‘liq emas</option>
+              <option value="missingUz">UZ tarjimasi yo‘q</option>
+              <option value="missingEn">EN tarjimasi yo‘q</option>
+            </select>
+            <input
+              className="admin-search-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Taom yoki kategoriya qidirish..."
+            />
+          </div>
         </div>
 
         <div className="food-admin-grid">
@@ -1034,6 +1089,16 @@ export default function FoodsTab({
                     {food.source === "delever" ? "Delever" : "Local"}
                   </span>
                 </div>
+                {getTranslationIssues(food).length > 0 && (
+                  <div className="food-source-row" style={{ marginTop: 6 }}>
+                    {getTranslationIssues(food).some((issue) => issue.endsWith("Uz")) && (
+                      <span className="source-badge local">UZ tarjima yo‘q</span>
+                    )}
+                    {getTranslationIssues(food).some((issue) => issue.endsWith("En")) && (
+                      <span className="source-badge local">EN tarjima yo‘q</span>
+                    )}
+                  </div>
+                )}
                 <h4>{getField(food.title, "uz")}</h4>
                 <p className="food-admin-price">
                   {food.price?.toLocaleString()} so'm

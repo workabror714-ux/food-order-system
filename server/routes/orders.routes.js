@@ -166,6 +166,7 @@ router.post(
         filialId,
         filialName,
         persons,
+        source,
       } = req.body || {};
 
       if (
@@ -188,6 +189,33 @@ router.post(
       const normalizedPaymentType =
         paymentType ||
         "click";
+
+      const normalizedSource =
+        String(source || "")
+          .trim()
+          .toLowerCase();
+
+      // Sayt buyurtmasi: faqat yetkazib berish va oldindan onlayn to'lov.
+      // Botning mavjud pickup/cash oqimiga tegilmaydi.
+      if (normalizedSource === "website") {
+        if (normalizedOrderType !== "delivery") {
+          return res
+            .status(400)
+            .json({
+              message:
+                "Sayt orqali faqat yetkazib berish buyurtmasi qabul qilinadi.",
+            });
+        }
+
+        if (!["click", "payme"].includes(normalizedPaymentType)) {
+          return res
+            .status(400)
+            .json({
+              message:
+                "Sayt orqali faqat Click yoki Payme bilan onlayn to'lov qilish mumkin.",
+            });
+        }
+      }
 
       if (
         ![

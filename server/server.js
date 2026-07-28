@@ -73,9 +73,6 @@ app.use(require("./routes/orders.routes"));
 app.use(require("./routes/booking.routes"));
 app.use(require("./routes/payments.routes"));
 
-// Website naqd orderini Telegram orqali tasdiqlash.
-// Bu route /webhook/telegram ni mavjud webhook route'dan oldin ushlashi kerak.
-app.use(require("./routes/websiteConfirmation.routes"));
 app.use(require("./routes/webhooks.routes"));
 
 app.use(require("./routes/banners.routes"));

@@ -17,7 +17,6 @@ const { redis } = require("./lib/redis");
 const app = express();
 
 // ── CORS: CORS_ORIGINS env bo'lsa faqat shu domenlar; bo'lmasa hammaga (dev) ──
-// Trailing slash'ga chidamli: origin brauzerda slashsiz keladi, env'da slash bo'lsa ham mos keladi.
 const stripSlash = (s) => s.replace(/\/+$/, "");
 const corsOrigins = (process.env.CORS_ORIGINS || "").split(",").map(s => stripSlash(s.trim())).filter(Boolean);
 if (corsOrigins.length === 0) console.warn("⚠️  CORS_ORIGINS env yo'q — barcha domenlarga ochiq (faqat dev uchun).");
@@ -38,7 +37,7 @@ app.use("/uploads", express.static("uploads"));
 
 // Health/readiness — load balancer / container uchun (rate-limitdan oldin)
 app.get(["/health", "/healthz"], (req, res) => {
-  const dbState = mongoose.connection.readyState; // 1 = connected
+  const dbState = mongoose.connection.readyState;
   const healthy = dbState === 1;
   res.status(healthy ? 200 : 503).json({
     status: healthy ? "ok" : "degraded",
@@ -49,7 +48,7 @@ app.get(["/health", "/healthz"], (req, res) => {
   });
 });
 
-// Reverse-proxy ortida (nginx) haqiqiy IP uchun + global flood himoyasi
+// Reverse-proxy ortida haqiqiy IP uchun + global flood himoyasi
 if (process.env.TRUST_PROXY) app.set("trust proxy", process.env.TRUST_PROXY);
 app.use(globalRateLimit);
 
@@ -65,7 +64,7 @@ const createFirstAdmin = async () => {
   } catch (e) { console.error(e); }
 };
 
-// ════ ROUTE'LAR (domenlar bo'yicha) ═══════════════════════════════════════════
+// ════ ROUTE'LAR ═══════════════════════════════════════════════════════════════
 app.use(require("./routes/images.routes"));
 app.use(require("./routes/auth.routes"));
 app.use(require("./routes/filials.routes"));
@@ -73,14 +72,17 @@ app.use(require("./routes/foods.routes"));
 app.use(require("./routes/orders.routes"));
 app.use(require("./routes/booking.routes"));
 app.use(require("./routes/payments.routes"));
+
+// Website naqd orderini Telegram orqali tasdiqlash.
+// Bu route /webhook/telegram ni mavjud webhook route'dan oldin ushlashi kerak.
+app.use(require("./routes/websiteConfirmation.routes"));
 app.use(require("./routes/webhooks.routes"));
+
 app.use(require("./routes/banners.routes"));
 app.use(require("./routes/customers.routes"));
 app.use(require("./routes/delever.routes"));
 
 // ════ FON JARAYONLARI ════════════════════════════════════════════════════════
-// Ko'p instance bo'lsa: lock orqali faqat BITTA instance sweepni bajaradi (dublikatsiz).
-// Alohida worker ishlatilsa: API'da RUN_JOBS=false qo'ying, `node worker.js` ishga tushiring.
 const { tryLock } = require("./lib/redis");
 if (process.env.RUN_JOBS !== "false") {
   const autoCancelTimer = setInterval(async () => {
@@ -100,7 +102,7 @@ const server = app.listen(PORT, async () => {
   await seedFilials();
 });
 
-// ─── GRACEFUL SHUTDOWN (container/k8s SIGTERM uchun) ──────────────────────────
+// ─── GRACEFUL SHUTDOWN ────────────────────────────────────────────────────────
 let shuttingDown = false;
 const shutdown = (sig) => {
   if (shuttingDown) return;
@@ -112,7 +114,6 @@ const shutdown = (sig) => {
       .then(() => redis && redis.quit().catch(() => {}))
       .finally(() => { console.log("✅ Toza yopildi"); process.exit(0); });
   });
-  // 10s ichida yopilmasa — majburiy chiqish
   setTimeout(() => { console.error("⏱ Majburiy chiqish"); process.exit(1); }, 10000).unref();
 };
 process.on("SIGTERM", () => shutdown("SIGTERM"));

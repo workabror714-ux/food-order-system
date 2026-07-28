@@ -68,6 +68,7 @@ const createFirstAdmin = async () => {
 app.use(require("./routes/images.routes"));
 app.use(require("./routes/auth.routes"));
 app.use(require("./routes/filials.routes"));
+app.use(require("./routes/geocode.routes"));
 app.use(require("./routes/foods.routes"));
 app.use(require("./routes/orders.routes"));
 app.use(require("./routes/booking.routes"));

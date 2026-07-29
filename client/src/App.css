@@ -1487,3 +1487,37 @@ svg.lucide { vertical-align: middle; flex-shrink: 0; }
   }
 }
 /* === /YALPIZ MOBILE BANNER 138PX FIX === */
+
+
+/* === YALPIZ BANNER RESPONSIVE WIDTH FIX === */
+@media (max-width: 640px) {
+  .g-hero-viewport {
+    width: 100%;
+    height: 138px;
+    min-height: 138px;
+    max-height: 138px;
+    overflow: hidden;
+  }
+
+  .g-hero-track,
+  .g-hero-slide {
+    width: 100%;
+    height: 138px;
+    min-height: 138px;
+    max-height: 138px;
+  }
+
+  .g-hero-media.is-image {
+    position: absolute;
+    inset: -1px;
+    width: calc(100% + 2px);
+    height: calc(100% + 2px);
+    max-width: none;
+    display: block;
+    object-fit: cover !important;
+    object-position: center center;
+    background: transparent;
+    animation: none;
+  }
+}
+/* === /YALPIZ BANNER RESPONSIVE WIDTH FIX === */

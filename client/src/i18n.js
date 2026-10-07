@@ -63,6 +63,10 @@ export const TRANSLATIONS = {
     // Login
     enterPhone: "Telefon raqamingizni kiriting", enterName: "Ismingizni kiriting",
     continue: "Davom etish →", language: "Til",
+    // Ish vaqti / restoran holati
+    restaurantOpenNow: "Hozir ochiq", restaurantClosedNow: "Hozir yopiq",
+    restaurantClosedHint: "Menyu bilan tanishib chiqishingiz mumkin",
+    workingHours: "Ish vaqti",
   },
   ru: {
     appName: "Ялпиз", appFull: "Ялпиз Ресторан",
@@ -118,6 +122,9 @@ export const TRANSLATIONS = {
     statusOnWay: "В пути", statusDelivered: "Доставлен!", statusCancelled: "Отменён",
     enterPhone: "Введите номер телефона", enterName: "Введите имя",
     continue: "Продолжить →", language: "Язык",
+    restaurantOpenNow: "Сейчас открыто", restaurantClosedNow: "Сейчас закрыто",
+    restaurantClosedHint: "Вы можете ознакомиться с меню",
+    workingHours: "Часы работы",
   },
   en: {
     appName: "Yalpiz", appFull: "Yalpiz Restaurant",
@@ -173,6 +180,9 @@ export const TRANSLATIONS = {
     statusOnWay: "On the way", statusDelivered: "Delivered!", statusCancelled: "Cancelled",
     enterPhone: "Enter your phone number", enterName: "Enter your name",
     continue: "Continue →", language: "Language",
+    restaurantOpenNow: "Open now", restaurantClosedNow: "Closed now",
+    restaurantClosedHint: "You can still browse the menu",
+    workingHours: "Working hours",
   },
 };
 

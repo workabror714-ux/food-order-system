@@ -151,6 +151,23 @@ h1, h2, h3, h4, h5, h6 {
 .g-search-input::placeholder { color: var(--gray); }
 .g-search-clear { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 1rem; }
 
+/* ─── RESTORAN OCHIQ / YOPIQ HOLATI ───────────────────────────── */
+.g-status-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin: 0 14px 10px; padding: 7px 14px; border-radius: 12px;
+  font-size: 0.78rem; font-weight: 700;
+}
+.g-status-bar.open { background: #d1fae5; color: #065f46; }
+.g-status-bar.closed { background: #fee2e2; color: #991b1b; }
+.g-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: currentColor;
+}
+.g-status-bar.open .g-status-dot { box-shadow: 0 0 0 3px rgba(6,95,70,0.15); }
+.g-status-bar.closed .g-status-dot { box-shadow: 0 0 0 3px rgba(153,27,27,0.15); }
+.g-status-text { white-space: nowrap; }
+.g-status-hint { font-weight: 600; opacity: 0.85; }
+
 /* ─── CATEGORY TABS ────────────────────────────────────────── */
 .g-cat-tabs-wrap { overflow-x: auto; padding: 0 14px 10px; scrollbar-width: none; }
 .g-cat-tabs-wrap::-webkit-scrollbar { display: none; }

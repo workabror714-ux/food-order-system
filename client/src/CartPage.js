@@ -17,6 +17,12 @@ const getField = (f, l) => { if (!f) return ""; if (typeof f === "string") retur
 const fmtPhone = (v) => { const d=v.replace(/\D/g,"").replace(/^998/,"").slice(0,9); let r=""; if(d.length>0)r+=d.slice(0,2); if(d.length>2)r+=" "+d.slice(2,5); if(d.length>5)r+=" "+d.slice(5,7); if(d.length>7)r+=" "+d.slice(7,9); return r; };
 const rawPhone = (f) => "+998"+f.replace(/\s/g,"");
 const isValid = (f) => f.replace(/\s/g,"").length===9;
+// Filial yopiq bo'lsa sabab ko'rsatiladi: qo'lda yopilgan yoki ish vaqti tugagan
+const filialClosedLabel = (f) => {
+  if (f.isActive === false) return "Vaqtincha yopiq";
+  if (f.useSchedule && f.openTime && f.closeTime) return `Hozir yopiq (${f.openTime}–${f.closeTime})`;
+  return "Hozir yopiq";
+};
 
 
 
@@ -345,14 +351,14 @@ export default function CartPage() {
               <div style={{display:"flex",flexDirection:"column",gap:10,padding:"14px 16px",background:"#f0fdf4",borderRadius:14,border:"2px solid var(--g3)"}}>
                 <label style={{fontSize:"0.82rem",fontWeight:700,color:"var(--g4)"}}><AppIcon name="home" size={15} /> Qaysi filialdan olib ketasiz?</label>
                 {FILIALS.map(f => {
-                  const closed = f.isActive === false;
+                  const closed = f.isOpenNow === false;
                   return (
                   <div key={f.id} className={`order-type-card ${selectedFilial?.id===f.id?"selected":""}`}
                     style={{padding:"10px 14px", opacity: closed?0.55:1, cursor: closed?"not-allowed":"pointer"}}
                     onClick={() => { if (!closed) setSelectedFilial(f); }}>
                     <span style={{fontSize:"1.2rem",display:"inline-flex",color:"var(--g)"}}><AppIcon name="location" size={18} /></span>
                     <div style={{flex:1,fontSize:"0.85rem",fontWeight:700,color:"var(--g4)"}}>
-                      {f.name}{closed && <span style={{color:"#b91c1c",fontWeight:700}}> — <AppIcon name="ban" size={13} /> Vaqtincha yopiq</span>}
+                      {f.name}{closed && <span style={{color:"#b91c1c",fontWeight:700}}> — <AppIcon name="ban" size={13} /> {filialClosedLabel(f)}</span>}
                     </div>
                     {!closed && <div className={`order-type-check ${selectedFilial?.id===f.id?"active":""}`}><AppIcon name="check" size={14} strokeWidth={3} /></div>}
                   </div>
@@ -374,14 +380,14 @@ export default function CartPage() {
               <div style={{display:"flex",flexDirection:"column",gap:8,padding:"14px 16px",background:"#fff9e6",borderRadius:14,border:"2px solid #fde68a"}}>
                 <label style={{fontSize:"0.82rem",fontWeight:700,color:"#92400e"}}><AppIcon name="home" size={15} /> Qaysi filialdan yetkazish kerak?</label>
                 {FILIALS.map(f => {
-                  const closed = f.isActive === false;
+                  const closed = f.isOpenNow === false;
                   return (
                   <div key={f.id} className={`order-type-card ${selectedFilial?.id===f.id?"selected":""}`}
                     style={{padding:"10px 14px",background:"white", opacity: closed?0.55:1, cursor: closed?"not-allowed":"pointer"}}
                     onClick={() => { if (!closed) setSelectedFilial(f); }}>
                     <span style={{fontSize:"1.2rem",display:"inline-flex",color:"var(--g)"}}><AppIcon name="location" size={18} /></span>
                     <div style={{flex:1,fontSize:"0.85rem",fontWeight:700,color:"var(--g4)"}}>
-                      {f.name}{closed && <span style={{color:"#b91c1c",fontWeight:700}}> — <AppIcon name="ban" size={13} /> Vaqtincha yopiq</span>}
+                      {f.name}{closed && <span style={{color:"#b91c1c",fontWeight:700}}> — <AppIcon name="ban" size={13} /> {filialClosedLabel(f)}</span>}
                     </div>
                     {!closed && <div className={`order-type-check ${selectedFilial?.id===f.id?"active":""}`}><AppIcon name="check" size={14} strokeWidth={3} /></div>}
                   </div>

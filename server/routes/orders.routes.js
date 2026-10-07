@@ -17,6 +17,10 @@ const {
 } = require("../services/filials");
 
 const {
+  isFilialOpenNow,
+} = require("../lib/workingHours");
+
+const {
   calcMilleniumDeliveryPrice,
 } = require("../integrations/millenium");
 
@@ -80,15 +84,14 @@ router.post(
       }
 
       if (
-        cpFilial.isActive ===
-        false
+        !isFilialOpenNow(cpFilial)
       ) {
         return res
           .status(400)
           .json({
             success: false,
             message:
-              "Bu filial vaqtincha yopiq",
+              "Bu filial hozir yopiq",
           });
       }
 
@@ -281,14 +284,14 @@ router.post(
 
       if (
         filialId &&
-        orderFilial
-          ?.isActive === false
+        orderFilial &&
+        !isFilialOpenNow(orderFilial)
       ) {
         return res
           .status(400)
           .json({
             message:
-              "Tanlangan filial vaqtincha yopiq. Boshqa filialni tanlang.",
+              "Tanlangan filial hozir yopiq. Boshqa filialni tanlang.",
           });
       }
 

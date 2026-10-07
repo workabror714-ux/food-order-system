@@ -21,6 +21,9 @@ const _loadFromDb = async () => {
       _id: String(f._id), slug: f.slug, name: f.name,
       address: f.address || "", lat: f.lat, lng: f.lng,
       isActive: f.isActive !== false,
+      useSchedule: !!f.useSchedule,
+      openTime: f.openTime || "",
+      closeTime: f.closeTime || "",
     };
   }
   FILIALS = next;

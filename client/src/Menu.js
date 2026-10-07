@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./App.css";
 import { getLang, setLangStore, TRANSLATIONS, LOGO_GREEN, LOGO_WHITE } from "./i18n";
 import { CategoryIcon, AppIcon } from "./icons";
-import { cachedGet } from "./api";
+import { cachedGet, invalidateCache } from "./api";
 import { thumb, imgFallback } from "./img";
 
 const CATEGORY_ORDER = [
@@ -59,6 +59,7 @@ export default function Menu() {
   const [activeBanner, setActiveBanner] = useState(0);
   const [profile, setProfile] = useState(getProfile);
   const [lang, setLang] = useState(getLang);
+  const [filials, setFilials] = useState([]);
   const catRefs = useRef({});
   const navigate = useNavigate();
   const t = TRANSLATIONS[lang] || TRANSLATIONS.uz;
@@ -148,6 +149,19 @@ export default function Menu() {
     };
   }, []);
 
+  // Restoran ochiq/yopiqligi (admin panelda belgilangan ish vaqtiga qarab).
+  // Har 60 soniyada yangilanadi — foydalanuvchi sahifani ochiq qoldirsa ham holat yangi turadi.
+  useEffect(() => {
+    const loadFilials = () => {
+      cachedGet("/api/filials", 55 * 1000)
+        .then(d => setFilials(Array.isArray(d) ? d : []))
+        .catch(() => {});
+    };
+    loadFilials();
+    const iv = setInterval(() => { invalidateCache("/api/filials"); loadFilials(); }, 60 * 1000);
+    return () => clearInterval(iv);
+  }, []);
+
   const categoriesRaw = sortCategories([
     ...new Map(
       foods.map((food) => [
@@ -179,6 +193,12 @@ export default function Menu() {
   const changeQty = (id, delta, e) => { e.stopPropagation(); const nc = cart.map(i => i._id === id ? { ...i, qty: i.qty + delta } : i).filter(i => i.qty > 0); setCart(nc); saveCart(nc); };
   const changeLang = (l) => { setLang(l); setLangStore(l); };
   const initials = profile?.name ? profile.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) : null;
+
+  // Hech bo'lmasa bitta filial hozir ochiq bo'lsa — restoran "ochiq" hisoblanadi.
+  // Filiallar hali yuklanmagan/olinmagan bo'lsa, badge umuman ko'rsatilmaydi.
+  const restaurantOpen = filials.length > 0 ? filials.some(f => f.isOpenNow !== false) : null;
+  const scheduledFilial = filials.find(f => f.useSchedule && f.openTime && f.closeTime);
+  const workingHoursText = scheduledFilial ? `${scheduledFilial.openTime}–${scheduledFilial.closeTime}` : null;
 
   if (loading) return (
     <div className="g-root visible">
@@ -231,6 +251,17 @@ export default function Menu() {
             )}
           </div>
         </div>
+        {restaurantOpen !== null && (
+          <div className={`g-status-bar ${restaurantOpen ? "open" : "closed"}`}>
+            <span className="g-status-dot" />
+            <span className="g-status-text">{restaurantOpen ? t.restaurantOpenNow : t.restaurantClosedNow}</span>
+            {!restaurantOpen && (
+              <span className="g-status-hint">
+                {t.restaurantClosedHint}{workingHoursText ? ` · ${t.workingHours}: ${workingHoursText}` : ""}
+              </span>
+            )}
+          </div>
+        )}
         <div className="g-search-bar">
           <span className="g-search-icon"><AppIcon name="search" size={18} /></span>
           <input className="g-search-input" placeholder={t.search} value={search} onChange={e => setSearch(e.target.value)} />
